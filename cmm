@@ -167,27 +167,19 @@ local function UpdateVisuals(entry)
     box.Thickness = Environment.Box.Thickness
     box.Visible = Environment.Settings.Enabled and Environment.Box.Enabled and visible
     
-    if Environment.Box.FillEnabled then
-        fillBox.Position = position
-        fillBox.Size = size
-        fillBox.Color = CoreFunctions.GetTeamColor(player)
-        fillBox.Transparency = Environment.Box.FillTransparency
-        fillBox.Filled = true
-        fillBox.Visible = Environment.Settings.Enabled and visible
-    else
-        fillBox.Visible = false
-    end
+    fillBox.Position = position
+    fillBox.Size = size
+    fillBox.Color = CoreFunctions.GetTeamColor(player)
+    fillBox.Transparency = Environment.Box.FillTransparency
+    fillBox.Filled = true
+    fillBox.Visible = Environment.Settings.Enabled and Environment.Box.FillEnabled and visible
 
-    if Environment.Box.Outline then
-        boxOutline.Position = position
-        boxOutline.Size = size
-        boxOutline.Color = Environment.Box.OutlineColor
-        boxOutline.Thickness = Environment.Box.Thickness + 1
-        boxOutline.Transparency = Environment.Box.Transparency
-        boxOutline.Visible = Environment.Settings.Enabled and visible
-    else
-        boxOutline.Visible = false
-    end
+    boxOutline.Position = position
+    boxOutline.Size = size
+    boxOutline.Color = Environment.Box.OutlineColor
+    boxOutline.Thickness = Environment.Box.Thickness + 1
+    boxOutline.Transparency = Environment.Box.Transparency
+    boxOutline.Visible = Environment.Settings.Enabled and Environment.Box.Outline and visible
     
     if Environment.HealthBar.Enabled then
         local health = math.clamp(humanoid.Health, 0, humanoid.MaxHealth)
@@ -203,18 +195,14 @@ local function UpdateVisuals(entry)
         healthBar.Color = CoreFunctions.GetColorFromHealth(health, humanoid.MaxHealth)
         healthBar.Thickness = barWidth
         healthBar.Transparency = Environment.HealthBar.Transparency
-        healthBar.Visible = Environment.Settings.Enabled and visible
+        healthBar.Visible = Environment.Settings.Enabled and Environment.HealthBar.Enabled and visible
         
-        if Environment.HealthBar.Outline then
-            healthOutline.From = Vector2new(barX, position.Y + barHeight + 1)
-            healthOutline.To = Vector2new(barX, position.Y - 1)
-            healthOutline.Color = Environment.HealthBar.OutlineColor
-            healthOutline.Thickness = barWidth + 1
-            healthOutline.Transparency = Environment.HealthBar.Transparency
-            healthOutline.Visible = Environment.Settings.Enabled and visible
-        else
-            healthOutline.Visible = false
-        end
+        healthOutline.From = Vector2new(barX, position.Y + barHeight + 1)
+        healthOutline.To = Vector2new(barX, position.Y - 1)
+        healthOutline.Color = Environment.HealthBar.OutlineColor
+        healthOutline.Thickness = barWidth + 1
+        healthOutline.Transparency = Environment.HealthBar.Transparency
+        healthOutline.Visible = Environment.Settings.Enabled and Environment.HealthBar.Enabled and Environment.HealthBar.Outline and visible
     else
         healthBar.Visible = false
         healthOutline.Visible = false
