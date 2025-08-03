@@ -25,7 +25,7 @@ local IsDescendantOf = function(self, parent) return self:IsDescendantOf(parent)
 
 getgenv().SimpleESP = {
     Settings = {
-        Enabled = true,
+        Enabled = false,
         HideTeam = false,
         TeamColorEnabled = false,
         AliveCheck = true,
@@ -105,8 +105,10 @@ local CoreFunctions = {
         return position, size, true
     end,
     GetTeamColor = function(player)
-        if Environment.Settings.TeamColorEnabled and player.Team == LocalPlayer.Team then
-            return Environment.Settings.TeamColor
+        if Environment.Settings.TeamColorEnabled then
+            return player.Team == LocalPlayer.Team 
+                and Environment.Settings.TeamColor 
+                or Environment.Box.Color
         end
         return Environment.Box.Color
     end
