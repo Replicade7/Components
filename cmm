@@ -28,8 +28,7 @@ getgenv().SimpleESP = {
         Enabled = false,
         HideTeam = false,
         TeamColorEnabled = false,
-        AliveCheck = true,
-        TeamColor = Color3fromRGB(170, 170, 255)
+        AliveCheck = true
     },
     Box = {
         Enabled = true,
@@ -105,10 +104,8 @@ local CoreFunctions = {
         return position, size, true
     end,
     GetTeamColor = function(player)
-        if Environment.Settings.TeamColorEnabled then
-            return player.Team == LocalPlayer.Team 
-                and Environment.Settings.TeamColor 
-                or Environment.Box.Color
+        if Environment.Settings.TeamColorEnabled and player.Team then
+            return player.Team.TeamColor.Color
         end
         return Environment.Box.Color
     end
@@ -176,7 +173,7 @@ local function UpdateVisuals(entry)
         fillBox.Color = CoreFunctions.GetTeamColor(player)
         fillBox.Transparency = Environment.Box.FillTransparency
         fillBox.Filled = true
-        fillBox.Visible = box.Visible
+        fillBox.Visible = Environment.Settings.Enabled and visible
     else
         fillBox.Visible = false
     end
@@ -187,7 +184,7 @@ local function UpdateVisuals(entry)
         boxOutline.Color = Environment.Box.OutlineColor
         boxOutline.Thickness = Environment.Box.Thickness + 1
         boxOutline.Transparency = Environment.Box.Transparency
-        boxOutline.Visible = box.Visible
+        boxOutline.Visible = Environment.Settings.Enabled and visible
     else
         boxOutline.Visible = false
     end
@@ -214,7 +211,7 @@ local function UpdateVisuals(entry)
             healthOutline.Color = Environment.HealthBar.OutlineColor
             healthOutline.Thickness = barWidth + 1
             healthOutline.Transparency = Environment.HealthBar.Transparency
-            healthOutline.Visible = healthBar.Visible
+            healthOutline.Visible = Environment.Settings.Enabled and visible
         else
             healthOutline.Visible = false
         end
