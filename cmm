@@ -51,7 +51,8 @@ getgenv().SimpleESP = {
         Origin = "Bottom",
         FollowMouse = false,
         OutlineColor = Color3fromRGB(0, 0, 0),
-        Outline = false
+        Outline = false,
+        Transparency = 1
     },
     WrappedObjects = {}
 }
@@ -213,7 +214,7 @@ local function UpdateVisuals(entry)
             fromPos = Vector2new(mouse.X, mouse.Y + 36)
         end
         local toPos
-        if Environment.Box.Enabled then
+        if Environment.Box.Enabled and box.Visible then
             toPos = Vector2new(position.X + size.X / 2, position.Y + size.Y)
         else
             local HumPos = WorldToViewportPoint(character.HumanoidRootPart.Position)
@@ -229,20 +230,24 @@ local function UpdateVisuals(entry)
         tracer.To = toPos
         tracer.Color = CoreFunctions.GetTracerColor(player)
         tracer.Thickness = Environment.Tracer.Thickness
-        tracer.Transparency = Environment.Box.Transparency
+        tracer.Transparency = Environment.Tracer.Transparency
         tracer.Visible = espEnabled and visible
+        local outlineTransparency = Environment.Tracer.Transparency
+        if Environment.Box.Enabled and box.Visible then
+            outlineTransparency = Environment.Box.Transparency
+        end
         if Environment.Tracer.Outline then
             tracerOutline1.From = fromPos
             tracerOutline1.To = Vector2new(toPos.X - Environment.Tracer.Thickness, toPos.Y)
             tracerOutline1.Color = Environment.Tracer.OutlineColor
             tracerOutline1.Thickness = Environment.Tracer.Thickness * 2
-            tracerOutline1.Transparency = Environment.Box.Transparency
+            tracerOutline1.Transparency = outlineTransparency
             tracerOutline1.Visible = espEnabled and visible
             tracerOutline2.From = fromPos
             tracerOutline2.To = Vector2new(toPos.X + Environment.Tracer.Thickness, toPos.Y)
             tracerOutline2.Color = Environment.Tracer.OutlineColor
             tracerOutline2.Thickness = Environment.Tracer.Thickness * 2
-            tracerOutline2.Transparency = Environment.Box.Transparency
+            tracerOutline2.Transparency = outlineTransparency
             tracerOutline2.Visible = espEnabled and visible
         else
             tracerOutline1.Visible = false
@@ -304,4 +309,5 @@ _G_SetESPColor = function(color) Environment.Box.Color = color; Environment.Trac
 _G_TracerEnabled = function(state) Environment.Tracer.Enabled = state end
 _G_TracerOutlineEnabled = function(state) Environment.Tracer.Outline = state end
 _G_SetTracerOrigin = function(origin) Environment.Tracer.Origin = origin end
+_G_SetTracerTransparency = function(transparency) Environment.Tracer.Transparency = transparency end
 return Environment
