@@ -2,7 +2,7 @@ local game = game
 local Vector2new = Vector2.new
 local Drawingnew = Drawing.new
 local Color3fromRGB = Color3.fromRGB
-local mathfloor, mathabs, mathclamp = math.floor, math.abs, math.clamp
+local mathfloor, mathabs, mathclamp, mathrad, mathhuge, mathtan = math.floor, math.abs, math.clamp, math.rad, math.huge, math.tan
 local wait, spawn = task.wait, task.spawn
 local getgenv, cloneref = getgenv, cloneref or function(v) return v end
 local GameMetatable = getrawmetatable and getrawmetatable(game) or {}
@@ -12,6 +12,7 @@ local setrenderproperty = setrenderproperty or __newindex
 local Workspace = cloneref(game:GetService("Workspace"))
 local Players = cloneref(game:GetService("Players"))
 local RunService = cloneref(game:GetService("RunService"))
+local TweenService = cloneref(game:GetService("TweenService"))
 local CurrentCamera = __index(Workspace, "CurrentCamera")
 local LocalPlayer = __index(Players, "LocalPlayer")
 local WorldToViewportPoint = function(...) return CurrentCamera.WorldToViewportPoint(CurrentCamera, ...) end
@@ -53,6 +54,11 @@ getgenv().SimpleESP = {
         OutlineColor = Color3fromRGB(0, 0, 0),
         Outline = false,
         OutlineTransparency = 0.5
+    },
+    Skeleton = {
+        Enabled = false,
+        Color = Color3fromRGB(255, 255, 255),
+        Thickness = 1
     },
     WrappedObjects = {}
 }
@@ -97,6 +103,10 @@ local CoreFunctions = {
     GetTracerColor = function(player)
         if Environment.Settings.TeamColorEnabled and player.Team then return player.Team.TeamColor.Color end
         return Environment.Tracer.Color
+    end,
+    GetSkeletonColor = function(player)
+        if Environment.Settings.TeamColorEnabled and player.Team then return player.Team.TeamColor.Color end
+        return Environment.Skeleton.Color
     end
 }
 local function CreateVisuals(player)
@@ -259,6 +269,188 @@ local function UpdateVisuals(entry)
         tracerOutline2.Visible = false
     end
 end
+local SkeletonESP = {}
+SkeletonESP.__index = SkeletonESP
+function SkeletonESP.new()
+    local self = setmetatable({}, SkeletonESP)
+    self.espCache = {}
+    return self
+end
+function SkeletonESP:createDrawing(type, properties)
+    local drawing = Drawingnew(type)
+    for prop, val in pairs(properties) do
+        drawing[prop] = val
+    end
+    return drawing
+end
+function SkeletonESP:createComponents()
+    return {
+        SkeletonLines = {},
+        HeadCircle = self:createDrawing("Circle", {
+            Thickness = Environment.Skeleton.Thickness,
+            Color = Environment.Skeleton.Color,
+            Filled = false
+        })
+    }
+end
+local bodyConnections = {
+    R15 = {
+        {"Head", "UpperTorso"},
+        {"UpperTorso", "LowerTorso"},
+        {"LowerTorso", "LeftUpperLeg"},
+        {"LowerTorso", "RightUpperLeg"},
+        {"LeftUpperLeg", "LeftLowerLeg"},
+        {"LeftLowerLeg", "LeftFoot"},
+        {"RightUpperLeg", "RightLowerLeg"},
+        {"RightLowerLeg", "RightFoot"},
+        {"UpperTorso", "LeftUpperArm"},
+        {"UpperTorso", "RightUpperArm"},
+        {"LeftUpperArm", "LeftLowerArm"},
+        {"LeftLowerArm", "LeftHand"},
+        {"RightUpperArm", "RightLowerArm"},
+        {"RightUpperArm", "RightHand"}
+    },
+    R6 = {
+        {"Head", "Torso"},
+        {"Torso", "Left Arm"},
+        {"Torso", "Right Arm"},
+        {"Torso", "Left Leg"},
+        {"Torso", "Right Leg"}
+    }
+}
+function SkeletonESP:getPlayerColor(plr)
+    return Environment.Settings.TeamColorEnabled and plr.TeamColor and plr.TeamColor.Color or Environment.Skeleton.Color
+end
+function SkeletonESP:updateComponents(components, character, plr)
+    if Environment.Settings.HideTeam and plr.Team == LocalPlayer.Team then
+        self:hideComponents(components)
+        return
+    end
+    local hrp = character:FindFirstChild("HumanoidRootPart")
+    local humanoid = character:FindFirstChild("Humanoid")
+    if hrp and humanoid then
+        local hrpPosition, onScreen = CurrentCamera:WorldToViewportPoint(hrp.Position)
+        if onScreen then
+            if Environment.Skeleton.Enabled and Environment.Settings.Enabled then
+                local head = character:FindFirstChild("Head")
+                if head then
+                    local headPos = CurrentCamera:WorldToViewportPoint(head.Position)
+                    if headPos.Z > 0 then
+                        local headSize = head.Size.X
+                        local distance = headPos.Z
+                        local fov = mathrad(CurrentCamera.FieldOfView / 2)
+                        local scale = CurrentCamera.ViewportSize.Y / (2 * mathtan(fov) * distance)
+                        local radius = headSize * scale * 0.5
+                        local fixedRadius = (headSize * 0.5) * (1000 / (distance + 50))
+                        components.HeadCircle.Radius = (radius + fixedRadius) / 2
+                        components.HeadCircle.Position = Vector2.new(headPos.X, headPos.Y)
+                        components.HeadCircle.Visible = distance < 298
+                        components.HeadCircle.Color = self:getPlayerColor(plr)
+                        components.HeadCircle.Thickness = Environment.Skeleton.Thickness
+                        local connections = bodyConnections[humanoid.RigType.Name] or {}
+                        for _, connection in ipairs(connections) do
+                            local partA = character:FindFirstChild(connection[1])
+                            local partB = character:FindFirstChild(connection[2])
+                            if partA and partB then
+                                local line = components.SkeletonLines[connection[1].."-"..connection[2]] or self:createDrawing("Line", {
+                                    Thickness = Environment.Skeleton.Thickness,
+                                    Color = self:getPlayerColor(plr)
+                                })
+                                local posA = CurrentCamera:WorldToViewportPoint(partA.Position)
+                                local posB = CurrentCamera:WorldToViewportPoint(partB.Position)
+                                if partA.Name == "Head" then
+                                    local direction = (Vector2.new(posB.X, posB.Y) - Vector2.new(posA.X, posA.Y)).Unit
+                                    posA = Vector2.new(posA.X, posA.Y) + direction * components.HeadCircle.Radius
+                                elseif partB.Name == "Head" then
+                                    local direction = (Vector2.new(posA.X, posA.Y) - Vector2.new(posB.X, posB.Y)).Unit
+                                    posB = Vector2.new(posB.X, posB.Y) + direction * components.HeadCircle.Radius
+                                end
+                                line.From = Vector2.new(posA.X, posA.Y)
+                                line.To = Vector2.new(posB.X, posB.Y)
+                                line.Visible = true
+                                line.Color = self:getPlayerColor(plr)
+                                line.Thickness = Environment.Skeleton.Thickness
+                                components.SkeletonLines[connection[1].."-"..connection[2]] = line
+                            end
+                        end
+                    else
+                        components.HeadCircle.Visible = false
+                    end
+                else
+                    components.HeadCircle.Visible = false
+                end
+            else
+                self:hideComponents(components)
+            end
+        else
+            self:hideComponents(components)
+        end
+    else
+        self:hideComponents(components)
+    end
+end
+function SkeletonESP:hideComponents(components)
+    for _, line in pairs(components.SkeletonLines) do
+        line.Visible = false
+    end
+    components.HeadCircle.Visible = false
+end
+function SkeletonESP:removeEsp(plr)
+    local components = self.espCache[plr]
+    if components then
+        for _, line in pairs(components.SkeletonLines) do
+            line:Remove()
+        end
+        components.HeadCircle:Remove()
+        self.espCache[plr] = nil
+    end
+end
+local skeletonInstance = SkeletonESP.new()
+local function SkeletonESPFunction(plr)
+    local function Updater()
+        local renderConnection
+        local characterConnection
+        local function UpdateESP()
+            if renderConnection then
+                renderConnection:Disconnect()
+            end
+            renderConnection = RunService.RenderStepped:Connect(function()
+                pcall(function()
+                    if not Players:FindFirstChild(plr.Name) then
+                        renderConnection:Disconnect()
+                        if characterConnection then
+                            characterConnection:Disconnect()
+                        end
+                        skeletonInstance:removeEsp(plr)
+                        return
+                    end
+                    if not Environment.Settings.Enabled then
+                        skeletonInstance:hideComponents(skeletonInstance.espCache[plr] or {})
+                        return
+                    end
+                    if plr.Character and plr.Character:FindFirstChild("Humanoid") and plr.Character:FindFirstChild("HumanoidRootPart") and plr.Character.Humanoid.Health > 0 and plr.Character:FindFirstChild("Head") then
+                        local HumPos, OnScreen = CurrentCamera:WorldToViewportPoint(plr.Character.HumanoidRootPart.Position)
+                        if OnScreen then
+                            if not skeletonInstance.espCache[plr] then
+                                skeletonInstance.espCache[plr] = skeletonInstance:createComponents()
+                            end
+                            skeletonInstance:updateComponents(skeletonInstance.espCache[plr], plr.Character, plr)
+                        else
+                            skeletonInstance:hideComponents(skeletonInstance.espCache[plr] or {})
+                        end
+                    else
+                        skeletonInstance:hideComponents(skeletonInstance.espCache[plr] or {})
+                    end
+                end)
+            end)
+        end
+        characterConnection = plr.CharacterAdded:Connect(function()
+            UpdateESP()
+        end)
+        UpdateESP()
+    end
+    coroutine.wrap(Updater)()
+end
 local function InitESP()
     for _, player in ipairs(GetPlayers()) do
         if player ~= LocalPlayer then
@@ -298,6 +490,19 @@ local function InitESP()
     end)
 end
 InitESP()
+for _, v in pairs(Players:GetPlayers()) do
+    if v.Name ~= LocalPlayer.Name then
+        coroutine.wrap(SkeletonESPFunction)(v)
+    end
+end
+Players.PlayerAdded:Connect(function(newplr)
+    if newplr.Name ~= LocalPlayer.Name then
+        coroutine.wrap(SkeletonESPFunction)(newplr)
+    end
+end)
+Players.PlayerRemoving:Connect(function(plr)
+    skeletonInstance:removeEsp(plr)
+end)
 _G_ESPEnabled = function(state) Environment.Settings.Enabled = state end
 _G_BoxEnabled = function(state) Environment.Box.Enabled = state end
 _G_OutlineEnabled = function(state) Environment.Box.Outline = state end
@@ -305,9 +510,15 @@ _G_FillBoxEnabled = function(state) Environment.Box.FillEnabled = state end
 _G_HealthBarEnabled = function(state) Environment.HealthBar.Enabled = state end
 _G_TeamColorEnabled = function(state) Environment.Settings.TeamColorEnabled = state end
 _G_HideTeam = function(state) Environment.Settings.HideTeam = state end
-_G_SetESPColor = function(color) Environment.Box.Color = color; Environment.Tracer.Color = color end
+_G_SetESPColor = function(color) 
+    Environment.Box.Color = color
+    Environment.Tracer.Color = color
+    Environment.Skeleton.Color = color
+end
 _G_TracerEnabled = function(state) Environment.Tracer.Enabled = state end
 _G_TracerOutlineEnabled = function(state) Environment.Tracer.Outline = state end
 _G_SetTracerOrigin = function(origin) Environment.Tracer.Origin = origin end
 _G_SetTracerOutlineTransparency = function(transparency) Environment.Tracer.OutlineTransparency = transparency end
+_G_SkeletonEnabled = function(state) Environment.Skeleton.Enabled = state end
+_G_SetSkeletonThickness = function(thickness) Environment.Skeleton.Thickness = thickness end
 return Environment
