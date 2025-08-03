@@ -141,12 +141,15 @@ local function CalculateBox(character)
     local top = root.Position + topOffset
     local bottom = root.Position + bottomOffset
     
-    local topScreen, topVisible = WorldToViewportPoint(top)
-    local bottomScreen, bottomVisible = WorldToViewportPoint(bottom)
+    local topX, topY, topZ, topVisible = WorldToViewportPoint(top)
+    local bottomX, bottomY, bottomZ, bottomVisible = WorldToViewportPoint(bottom)
     
     if not (topVisible and bottomVisible) then 
         return nil, nil, false 
     end
+    
+    local topScreen = Vector2.new(topX, topY)
+    local bottomScreen = Vector2.new(bottomX, bottomY)
     
     local width = mathfloor(math.abs(topScreen.X - bottomScreen.X))
     local height = mathfloor(math.max(math.abs(bottomScreen.Y - topScreen.Y), width / 2))
