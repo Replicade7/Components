@@ -17,17 +17,16 @@ local RunService = cloneref(game:GetService("RunService"))
 
 local CurrentCamera = __index(Workspace, "CurrentCamera")
 local LocalPlayer = __index(Players, "LocalPlayer")
-local mouse = LocalPlayer:GetMouse()
 
 local WorldToViewportPoint = function(...) return CurrentCamera.WorldToViewportPoint(CurrentCamera, ...) end
 local GetPlayers = function() return Players:GetPlayers() end
 local GetPlayerFromCharacter = function(...) return Players:GetPlayerFromCharacter(...) end
 local IsDescendantOf = function(self, parent) return self:IsDescendantOf(parent) end
 
-getgenv()._G_2DBoxEnabled = {
+getgenv().SimpleESP = {
     Settings = {
         Enabled = true,
-        TeamCheck = false,
+        HideTeam = false,
         TeamColorEnabled = false,
         AliveCheck = true,
         TeamColor = Color3fromRGB(170, 170, 255)
@@ -51,20 +50,10 @@ getgenv()._G_2DBoxEnabled = {
         OutlineColor = Color3fromRGB(0, 0, 0),
         Outline = true
     },
-    Tracer = {
-        Enabled = true,
-        Color = Color3fromRGB(255, 255, 255),
-        Thickness = 1,
-        Origin = "Bottom",
-        FollowMouse = false,
-        Outline = true
-    },
-    WrappedObjects = {},
-    TracerLibraries = {},
-    TracerConnections = {}
+    WrappedObjects = {}
 }
 
-local Environment = getgenv()._G_2DBoxEnabled
+local Environment = getgenv().SimpleESP
 
 local CoreFunctions = {
     GetColorFromHealth = function(health, max)
@@ -116,11 +105,8 @@ local CoreFunctions = {
         return position, size, true
     end,
     GetTeamColor = function(player)
-        if Environment.Settings.TeamCheck and player.Team == LocalPlayer.Team then
+        if Environment.Settings.TeamColorEnabled and player.Team == LocalPlayer.Team then
             return Environment.Settings.TeamColor
-        end
-        if Environment.Settings.TeamColorEnabled then
-            return player.TeamColor.Color
         end
         return Environment.Box.Color
     end
@@ -152,13 +138,13 @@ local function UpdateVisuals(entry)
     local character = player.Character
     local humanoid = character and character:FindFirstChild("Humanoid")
     
-    if not character or not humanoid or (Environment.Settings.AliveCheck and humanoid.Health <= 0) then
+    if Environment.Settings.HideTeam and player.Team == LocalPlayer.Team then
         for _, obj in pairs(visuals.Box) do obj.Visible = false end
         for _, obj in pairs(visuals.HealthBar) do obj.Visible = false end
         return
     end
     
-    if Environment.Settings.TeamCheck and player.Team == LocalPlayer.Team then
+    if not character or not humanoid or (Environment.Settings.AliveCheck and humanoid.Health <= 0) then
         for _, obj in pairs(visuals.Box) do obj.Visible = false end
         for _, obj in pairs(visuals.HealthBar) do obj.Visible = false end
         return
@@ -236,118 +222,6 @@ local function UpdateVisuals(entry)
     end
 end
 
-local function NewLine(thickness, color, zindex)
-    local line = Drawingnew("Line")
-    line.Visible = false
-    line.From = Vector2new(0, 0)
-    line.To = Vector2new(0, 0)
-    line.Color = color
-    line.Thickness = thickness
-    line.Transparency = 1
-    line.ZIndex = zindex
-    return line
-end
-
-local function TracerESP(plr)
-    local library = {
-        blacktracer = NewLine(Environment.Tracer.Thickness * 2, Color3.new(0, 0, 0), 
-        tracer = NewLine(Environment.Tracer.Thickness, Environment.Tracer.Color)
-    }
-
-    Environment.TracerLibraries[plr] = library
-
-    local function Cleanup()
-        library.tracer:Remove()
-        library.blacktracer:Remove()
-        Environment.TracerLibraries[plr] = nil
-    end
-
-    local function Updater()
-        local renderConnection
-        local characterConnection
-
-        local function UpdateTracer()
-            if renderConnection then renderConnection:Disconnect() end
-
-            renderConnection = RunService.RenderStepped:Connect(function()
-                pcall(function()
-                    if not Players:FindFirstChild(plr.Name) then
-                        Cleanup()
-                        renderConnection:Disconnect()
-                        if characterConnection then characterConnection:Disconnect() end
-                        Environment.TracerConnections[plr] = nil
-                        return
-                    end
-
-                    if not Environment.Settings.Enabled or not Environment.Tracer.Enabled then
-                        library.tracer.Visible = false
-                        library.blacktracer.Visible = false
-                        return
-                    end
-
-                    if plr.Character and plr.Character:FindFirstChild("Humanoid") and 
-                       plr.Character:FindFirstChild("HumanoidRootPart") and plr.Character.Humanoid.Health > 0 and 
-                       plr.Character:FindFirstChild("Head") then
-                       
-                        if Environment.Settings.TeamCheck and plr.Team == LocalPlayer.Team then
-                            library.tracer.Visible = false
-                            library.blacktracer.Visible = false
-                            return
-                        end
-
-                        local HumPos, OnScreen = CurrentCamera:WorldToViewportPoint(plr.Character.HumanoidRootPart.Position)
-                        local head = CurrentCamera:WorldToViewportPoint(plr.Character.Head.Position)
-                        local DistanceY = math.clamp((Vector2new(head.X, head.Y) - Vector2new(HumPos.X, HumPos.Y)).magnitude, 2, math.huge)
-
-                        local fromPos
-                        if Environment.Tracer.Origin == "Center" then
-                            fromPos = CurrentCamera.ViewportSize * 0.5
-                        elseif Environment.Tracer.Origin == "Top" then
-                            fromPos = Vector2new(CurrentCamera.ViewportSize.X * 0.5, 0)
-                        elseif Environment.Tracer.Origin == "Bottom" then
-                            fromPos = Vector2new(CurrentCamera.ViewportSize.X * 0.5, CurrentCamera.ViewportSize.Y)
-                        end
-                        
-                        if Environment.Tracer.FollowMouse then
-                            fromPos = Vector2new(mouse.X, mouse.Y + 36)
-                        end
-                        
-                        library.tracer.From = fromPos
-                        library.blacktracer.From = fromPos
-
-                        local toPos
-                        if Environment.Tracer.Origin == "Top" then
-                            toPos = Vector2new(head.X, head.Y - DistanceY)
-                        else
-                            toPos = Vector2new(HumPos.X, HumPos.Y + DistanceY * 2)
-                        end
-                        
-                        library.tracer.To = toPos
-                        library.blacktracer.To = toPos
-                        
-                        library.tracer.Visible = OnScreen
-                        library.blacktracer.Visible = Environment.Tracer.Outline and OnScreen
-                        
-                        if Environment.Settings.TeamColorEnabled then
-                            library.tracer.Color = plr.TeamColor.Color
-                        else
-                            library.tracer.Color = Environment.Tracer.Color
-                        end
-                    else
-                        library.tracer.Visible = false
-                        library.blacktracer.Visible = false
-                    end
-                end)
-            end)
-        end
-
-        characterConnection = plr.CharacterAdded:Connect(UpdateTracer)
-        UpdateTracer()
-        Environment.TracerConnections[plr] = {renderConnection, characterConnection}
-    end
-    coroutine.wrap(Updater)()
-end
-
 local function InitESP()
     for _, player in ipairs(GetPlayers()) do
         if player ~= LocalPlayer then
@@ -395,34 +269,17 @@ local function InitESP()
             Environment.WrappedObjects[leftPlayer] = nil
         end
     end)
-
-    for _, v in pairs(Players:GetPlayers()) do
-        if v ~= LocalPlayer then
-            coroutine.wrap(TracerESP)(v)
-        end
-    end
-
-    Players.PlayerAdded:Connect(function(newplr)
-        if newplr ~= LocalPlayer then
-            coroutine.wrap(TracerESP)(newplr)
-        end
-    end)
-
-    Players.PlayerRemoving:Connect(function(plr)
-        if Environment.TracerConnections[plr] then
-            for _, conn in pairs(Environment.TracerConnections[plr]) do
-                conn:Disconnect()
-            end
-            Environment.TracerConnections[plr] = nil
-        end
-        if Environment.TracerLibraries[plr] then
-            local lib = Environment.TracerLibraries[plr]
-            lib.tracer:Remove()
-            lib.blacktracer:Remove()
-            Environment.TracerLibraries[plr] = nil
-        end
-    end)
 end
 
 InitESP()
+
+_G_ESPEnabled = function(state) Environment.Settings.Enabled = state end
+_G_BoxEnabled = function(state) Environment.Box.Enabled = state end
+_G_OutlineEnabled = function(state) Environment.Box.Outline = state end
+_G_FillBoxEnabled = function(state) Environment.Box.FillEnabled = state end
+_G_HealthBarEnabled = function(state) Environment.HealthBar.Enabled = state end
+_G_TeamColorEnabled = function(state) Environment.Settings.TeamColorEnabled = state end
+_G_HideTeam = function(state) Environment.Settings.HideTeam = state end
+_G_SetESPColor = function(color) Environment.Box.Color = color end
+
 return Environment
