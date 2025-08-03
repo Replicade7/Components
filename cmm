@@ -60,6 +60,12 @@ getgenv().SimpleESP = {
         Color = Color3fromRGB(255, 255, 255),
         Thickness = 1
     },
+    Arrows = {
+        Enabled = false,
+        Color = Color3fromRGB(255, 255, 255),
+        Transparency = 0,
+        Outline = true
+    },
     WrappedObjects = {}
 }
 local Environment = getgenv().SimpleESP
@@ -109,6 +115,129 @@ local CoreFunctions = {
         return Environment.Skeleton.Color
     end
 }
+local DistFromCenter = 80
+local TriangleHeight = 16
+local TriangleWidth = 16
+local TriangleFilled = true
+local TriangleThickness = 1
+local TriangleOutlineThickness = 2
+local TriangleOutlineColor = Color3fromRGB(0, 0, 0)
+local ArrowDrawings = {}
+local function GetRelative(pos, char)
+    if not char then return Vector2.new(0, 0) end
+    local rootP = char.PrimaryPart.Position
+    local camP = CurrentCamera.CFrame.Position
+    local relative = CFrame.new(Vector3.new(rootP.X, camP.Y, rootP.Z), camP):PointToObjectSpace(pos)
+    return Vector2.new(relative.X, relative.Z)
+end
+local function RotateVect(v, a)
+    a = math.rad(a)
+    local x = v.X * math.cos(a) - v.Y * math.sin(a)
+    local y = v.X * math.sin(a) + v.Y * math.cos(a)
+    return Vector2.new(x, y)
+end
+local function UpdateArrow(plr)
+    if not ArrowDrawings[plr] then
+        local arrowFill = Drawingnew("Triangle")
+        arrowFill.Visible = false
+        arrowFill.Filled = TriangleFilled
+        arrowFill.Thickness = TriangleThickness
+        arrowFill.Transparency = 1 - Environment.Arrows.Transparency
+        arrowFill.Color = Environment.Arrows.Color
+        arrowFill.ZIndex = 2
+        local arrowOutline = Drawingnew("Triangle")
+        arrowOutline.Visible = false
+        arrowOutline.Filled = false
+        arrowOutline.Thickness = TriangleOutlineThickness
+        arrowOutline.Transparency = 1
+        arrowOutline.Color = TriangleOutlineColor
+        arrowOutline.ZIndex = 1
+        ArrowDrawings[plr] = {
+            Fill = arrowFill,
+            Outline = arrowOutline
+        }
+    end
+    local arrowData = ArrowDrawings[plr]
+    local arrowFill = arrowData.Fill
+    local arrowOutline = arrowData.Outline
+    if not Environment.Settings.Enabled then
+        arrowFill.Visible = false
+        arrowOutline.Visible = false
+        return
+    end
+    local char = plr.Character
+    if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 then
+        local rootPart = char.HumanoidRootPart
+        local _, onScreen = CurrentCamera:WorldToViewportPoint(rootPart.Position)
+        if not onScreen then
+            if Environment.Settings.HideTeam and plr.Team == LocalPlayer.Team then
+                arrowFill.Visible = false
+                arrowOutline.Visible = false
+                return
+            end
+            local rel = GetRelative(rootPart.Position, LocalPlayer.Character)
+            if rel.Magnitude > 0.1 then
+                local direction = rel.unit
+                local base = direction * DistFromCenter
+                local sideLength = TriangleWidth / 2
+                local baseL = base + RotateVect(direction, 90) * sideLength
+                local baseR = base + RotateVect(direction, -90) * sideLength
+                local tip = direction * (DistFromCenter + TriangleHeight)
+                local center = CurrentCamera.ViewportSize / 2
+                arrowFill.PointA = center + baseL
+                arrowFill.PointB = center + baseR
+                arrowFill.PointC = center + tip
+                arrowOutline.PointA = center + baseL
+                arrowOutline.PointB = center + baseR
+                arrowOutline.PointC = center + tip
+                local espColor = Environment.Arrows.Color
+                if Environment.Settings.TeamColorEnabled and plr.TeamColor then
+                    espColor = plr.TeamColor.Color
+                end
+                arrowFill.Color = espColor
+                arrowFill.Transparency = 1 - Environment.Arrows.Transparency
+                arrowFill.Visible = Environment.Arrows.Enabled
+                arrowOutline.Visible = Environment.Arrows.Enabled and Environment.Arrows.Outline
+            else
+                 arrowFill.Visible = false
+                 arrowOutline.Visible = false
+            end
+        else
+            arrowFill.Visible = false
+            arrowOutline.Visible = false
+        end
+    else
+        arrowFill.Visible = false
+        arrowOutline.Visible = false
+    end
+end
+local function RemoveArrow(plr)
+    if ArrowDrawings[plr] then
+        ArrowDrawings[plr].Fill:Remove()
+        ArrowDrawings[plr].Outline:Remove()
+        ArrowDrawings[plr] = nil
+    end
+end
+RunService.RenderStepped:Connect(function()
+    pcall(function()
+        for _, plr in pairs(Players:GetPlayers()) do
+            if plr ~= LocalPlayer then
+                UpdateArrow(plr)
+            end
+        end
+    end)
+end)
+Players.PlayerAdded:Connect(function(newPlr)
+    if newPlr ~= LocalPlayer then
+    end
+end)
+Players.PlayerRemoving:Connect(function(plr)
+    RemoveArrow(plr)
+end)
+for _, plr in pairs(Players:GetPlayers()) do
+    if plr ~= LocalPlayer then
+    end
+end
 local function CreateVisuals(player)
     local fillBox = Drawingnew("Square")
     local boxOutline = Drawingnew("Square")
@@ -514,6 +643,7 @@ _G_SetESPColor = function(color)
     Environment.Box.Color = color
     Environment.Tracer.Color = color
     Environment.Skeleton.Color = color
+    Environment.Arrows.Color = color
 end
 _G_TracerEnabled = function(state) Environment.Tracer.Enabled = state end
 _G_TracerOutlineEnabled = function(state) Environment.Tracer.Outline = state end
@@ -521,4 +651,6 @@ _G_SetTracerOrigin = function(origin) Environment.Tracer.Origin = origin end
 _G_SetTracerOutlineTransparency = function(transparency) Environment.Tracer.OutlineTransparency = transparency end
 _G_SkeletonEnabled = function(state) Environment.Skeleton.Enabled = state end
 _G_SetSkeletonThickness = function(thickness) Environment.Skeleton.Thickness = thickness end
+_G_ArrowsEnabled = function(state) Environment.Arrows.Enabled = state end
+_G_SetArrowsTransparency = function(transparency) Environment.Arrows.Transparency = transparency end
 return Environment
