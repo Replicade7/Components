@@ -215,7 +215,11 @@ local function UpdateVisuals(entry)
         end
         local toPos
         if Environment.Box.Enabled then
-            toPos = Vector2new(position.X + size.X / 2, position.Y + size.Y)
+            if Environment.Tracer.Origin == "Top" then
+                toPos = Vector2new(position.X + size.X / 2, position.Y)
+            else
+                toPos = Vector2new(position.X + size.X / 2, position.Y + size.Y)
+            end
         else
             local HumPos = WorldToViewportPoint(character.HumanoidRootPart.Position)
             local head = WorldToViewportPoint(character.Head.Position)
