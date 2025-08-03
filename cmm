@@ -229,20 +229,20 @@ local function UpdateVisuals(entry)
         tracer.To = toPos
         tracer.Color = CoreFunctions.GetTracerColor(player)
         tracer.Thickness = Environment.Tracer.Thickness
-        tracer.Transparency = 1
+        tracer.Transparency = Environment.Box.Transparency
         tracer.Visible = espEnabled and visible
         if Environment.Tracer.Outline then
             tracerOutline1.From = fromPos
             tracerOutline1.To = Vector2new(toPos.X - Environment.Tracer.Thickness, toPos.Y)
             tracerOutline1.Color = Environment.Tracer.OutlineColor
             tracerOutline1.Thickness = Environment.Tracer.Thickness * 2
-            tracerOutline1.Transparency = 1
+            tracerOutline1.Transparency = Environment.Box.Transparency
             tracerOutline1.Visible = espEnabled and visible
             tracerOutline2.From = fromPos
             tracerOutline2.To = Vector2new(toPos.X + Environment.Tracer.Thickness, toPos.Y)
             tracerOutline2.Color = Environment.Tracer.OutlineColor
             tracerOutline2.Thickness = Environment.Tracer.Thickness * 2
-            tracerOutline2.Transparency = 1
+            tracerOutline2.Transparency = Environment.Box.Transparency
             tracerOutline2.Visible = espEnabled and visible
         else
             tracerOutline1.Visible = false
