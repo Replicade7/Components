@@ -50,14 +50,13 @@ getgenv().SimpleESP = {
         Color = Color3fromRGB(255, 255, 255),
         Thickness = 1,
         Origin = "Bottom",
-        Outline = true
     },
     WrappedObjects = {}
 }
 local Environment = getgenv().SimpleESP
 local CoreFunctions = {
     GetColorFromHealth = function(health, max)
-        return Color3fromRGB(255 - mathfloor(health / max * 255), mathfloor(health / max * 255), Environment.HealthBar.Blue)
+        return Color3fromRGB(255 - mathfloor(health / max * 255), mathfloor(health / max * 255), Environment.HealthBar.Blue
     end,
     CalculateBox = function(character)
         local root = character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart
@@ -212,13 +211,45 @@ local function UpdateVisuals(entry)
         end
         local endPoint
         if box.Visible then
-            endPoint = Vector2new(position.X + size.X / 2, position.Y + size.Y)
+            if Environment.Tracer.Origin == "Top" then
+                endPoint = Vector2new(position.X + size.X / 2, position.Y)
+            else
+                endPoint = Vector2new(position.X + size.X / 2, position.Y + size.Y)
+            end
         else
+            local head = character:FindFirstChild("Head")
             local root = character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart
-            if root then
-                local rootPos, rootVis = CurrentCamera:WorldToViewportPoint(root.Position)
-                if rootVis then
-                    endPoint = Vector2new(rootPos.X, rootPos.Y)
+            if not root then
+                tracer.Visible = false
+                tracerOutline1.Visible = false
+                tracerOutline2.Visible = false
+                return
+            end
+            local rootPos, rootVisible = CurrentCamera:WorldToViewportPoint(root.Position)
+            if not rootVisible then
+                tracer.Visible = false
+                tracerOutline1.Visible = false
+                tracerOutline2.Visible = false
+                return
+            end
+            local headScreen
+            local headVisible = false
+            if head then
+                local headPos, hVisible = CurrentCamera:WorldToViewportPoint(head.Position)
+                headVisible = hVisible
+                if headVisible then
+                    headScreen = Vector2.new(headPos.X, headPos.Y)
+                end
+            end
+            local rootScreen = Vector2.new(rootPos.X, rootPos.Y)
+            local distanceY = 2
+            if headScreen then
+                distanceY = math.abs(headScreen.Y - rootScreen.Y)
+            end
+            distanceY = math.clamp(distanceY, 2, math.huge)
+            if Environment.Tracer.Origin == "Top" then
+                if headScreen then
+                    endPoint = Vector2.new(headScreen.X, headScreen.Y - distanceY)
                 else
                     tracer.Visible = false
                     tracerOutline1.Visible = false
@@ -226,10 +257,7 @@ local function UpdateVisuals(entry)
                     return
                 end
             else
-                tracer.Visible = false
-                tracerOutline1.Visible = false
-                tracerOutline2.Visible = false
-                return
+                endPoint = Vector2.new(rootScreen.X, rootScreen.Y + distanceY * 2)
             end
         end
         tracer.From = originPoint
@@ -238,11 +266,11 @@ local function UpdateVisuals(entry)
         tracer.Visible = true
         tracerOutline1.From = originPoint
         tracerOutline1.To = Vector2.new(endPoint.X - Environment.Tracer.Thickness, endPoint.Y)
-        tracerOutline1.Color = Environment.Box.OutlineColor
+        tracerOutline1.Color = Color3.new(0, 0, 0)
         tracerOutline1.Visible = Environment.Box.Outline
         tracerOutline2.From = originPoint
         tracerOutline2.To = Vector2.new(endPoint.X + Environment.Tracer.Thickness, endPoint.Y)
-        tracerOutline2.Color = Environment.Box.OutlineColor
+        tracerOutline2.Color = Color3.new(0, 0, 0)
         tracerOutline2.Visible = Environment.Box.Outline
     else
         tracer.Visible = false
