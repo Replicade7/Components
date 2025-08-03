@@ -52,7 +52,7 @@ getgenv().SimpleESP = {
         FollowMouse = false,
         OutlineColor = Color3fromRGB(0, 0, 0),
         Outline = false,
-        OutlineTransparency = 1
+        OutlineTransparency = 0.5
     },
     WrappedObjects = {}
 }
