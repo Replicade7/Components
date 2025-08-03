@@ -1,306 +1,245 @@
-local game = game
-local Vector2new = Vector2.new
-local Drawingnew = Drawing.new
-local Color3fromRGB = Color3.fromRGB
-local mathfloor, mathabs, mathclamp = math.floor, math.abs, math.clamp
-local wait, spawn = task.wait, task.spawn
-local getgenv, cloneref = getgenv, cloneref or function(v) return v end
+--[[
+    Unified ESP Script
+    Manages 2D Box, HealthBar, and Tracers
+]]
 
-local Workspace = cloneref(game:GetService("Workspace"))
-local Players = cloneref(game:GetService("Players"))
-local RunService = cloneref(game:GetService("RunService"))
+--// Services & Variables
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
 
-local CurrentCamera = Workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
-local mouse = LocalPlayer:GetMouse()
-
+local CurrentCamera = Workspace.CurrentCamera
 local WorldToViewportPoint = function(...) return CurrentCamera:WorldToViewportPoint(...) end
-local GetPlayers = function() return Players:GetPlayers() end
 
-getgenv().SimpleESP = {
-    ESP = {
+--// Create the global table for settings and control
+_G.ESP = {
+    Settings = {
         Enabled = true,
         TeamCheck = false,
-        UseTeamColor = false,
-        Color = Color3fromRGB(255, 255, 255),
-        Outline = true
+        UseTeamColor = false
     },
     Box = {
         Enabled = true,
+        Color = Color3.fromRGB(255, 255, 255),
         Transparency = 1,
         Thickness = 1,
-        FillEnabled = true,
+        Outline = true,
+        OutlineColor = Color3.fromRGB(0, 0, 0),
+        FillEnabled = false,
         FillTransparency = 0.5
     },
     HealthBar = {
         Enabled = true,
-        Offset = 4,
-        Blue = 100,
-        Thickness = 1,
+        Thickness = 2,
         Transparency = 1,
-        Outline = true
+        Outline = true,
+        OutlineColor = Color3.fromRGB(0, 0, 0),
+        Offset = 4
     },
     Tracer = {
         Enabled = true,
+        Color = Color3.fromRGB(255, 255, 255),
         Thickness = 1,
-        Origin = "Bottom",
-        FollowMouse = false
-    }
+        Transparency = 1,
+        Origin = "Bottom", -- Options: "Bottom", "Top", "Center"
+        Outline = true,
+        OutlineColor = Color3.fromRGB(0, 0, 0)
+    },
+    WrappedObjects = {}
 }
 
-local Environment = getgenv().SimpleESP
+local ESP = _G.ESP
 
+--// Core utility functions
 local CoreFunctions = {
-    GetColorFromHealth = function(health, max)
-        return Color3fromRGB(255 - mathfloor(health / max * 255), mathfloor(health / max * 255), Environment.HealthBar.Blue)
-    end,
-    CalculateBox = function(character)
-        local root = character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart
-        if not root then return nil, nil, false end
-        local rigType = character:FindFirstChild("Torso") and "R6" or "R15"
-        local cameraUpVector = CurrentCamera.CFrame.UpVector
-        local rootUpVector = root.CFrame.UpVector
-        local topOffset, bottomOffset
-        if rigType == "R6" then
-            topOffset = rootUpVector * 0.5 + cameraUpVector
-            bottomOffset = rootUpVector * -4 - cameraUpVector
-        else
-            topOffset = rootUpVector * 1.8 + cameraUpVector
-            bottomOffset = rootUpVector * -2.5 - cameraUpVector
+    GetTeamColor = function(player)
+        if ESP.Settings.UseTeamColor and player.TeamColor then
+            return player.TeamColor.Color
         end
-        local top = root.Position + topOffset
-        local bottom = root.Position + bottomOffset
-        local topScreen, topVisible = WorldToViewportPoint(top)
-        local bottomScreen, bottomVisible = WorldToViewportPoint(bottom)
-        if not (topVisible and bottomVisible) then return nil, nil, false end
-        local width = mathfloor(mathabs(topScreen.X - bottomScreen.X))
-        local height = mathfloor(mathmax(mathabs(bottomScreen.Y - topScreen.Y), width / 2))
-        width = mathmax(width, 3)
-        height = mathmax(height, 3)
-        local boxWidth = mathfloor(mathmax(height / 1.5, width))
-        local size = Vector2new(boxWidth, height)
-        local position = Vector2new(mathfloor((topScreen.X + bottomScreen.X) / 2 - boxWidth / 2), mathfloor(mathmin(topScreen.Y, bottomScreen.Y)))
-        return position, size, true
+        return ESP.Tracer.Color -- Default color
+    end,
+    GetHealthColor = function(health, maxHealth)
+        local ratio = math.clamp(health / maxHealth, 0, 1)
+        return Color3.fromHSV(ratio * 0.33, 1, 1) -- Green to Red
     end
 }
 
-local function NewLine(thickness, color, zindex)
-    local line = Drawingnew("Line")
-    line.Visible = false
-    line.From = Vector2new(0, 0)
-    line.To = Vector2new(0, 0)
-    line.Color = color
-    line.Thickness = thickness
-    line.Transparency = 1
-    line.ZIndex = zindex
-    return line
-end
-
+--// Creates all necessary Drawing objects for a player
 local function CreateVisuals(player)
-    local fillBox = Drawingnew("Square")
-    local boxOutline = Drawingnew("Square")
-    local box = Drawingnew("Square")
-    local healthOutline = Drawingnew("Line")
-    local healthBar = Drawingnew("Line")
-    local tracer = NewLine(Environment.Tracer.Thickness, Environment.ESP.Color, 2)
-    local blacktracer = NewLine(Environment.Tracer.Thickness * 2, Color3fromRGB(0, 0, 0), 1)
-    local blacktracer2 = NewLine(Environment.Tracer.Thickness * 2, Color3fromRGB(0, 0, 0), 1)
-    box.Visible = false
-    boxOutline.Visible = false
-    fillBox.Visible = false
-    healthBar.Visible = false
-    healthOutline.Visible = false
-    tracer.Visible = false
-    blacktracer.Visible = false
-    blacktracer2.Visible = false
+    local box = Drawing.new("Square")
+    local boxOutline = Drawing.new("Square")
+    local boxFill = Drawing.new("Square")
+    local healthBar = Drawing.new("Line")
+    local healthBarOutline = Drawing.new("Line")
+    local tracer = Drawing.new("Line")
+    local tracerOutline = Drawing.new("Line")
+
+    box.Visible, boxOutline.Visible, boxFill.Visible = false, false, false
+    healthBar.Visible, healthBarOutline.Visible = false, false
+    tracer.Visible, tracerOutline.Visible = false, false
+
     return {
-        Box = {box, boxOutline, fillBox},
-        HealthBar = {healthBar, healthOutline},
-        Tracer = {tracer, blacktracer, blacktracer2},
-        Player = player
+        Player = player,
+        Box = {box, boxOutline, boxFill},
+        HealthBar = {healthBar, healthBarOutline},
+        Tracer = {tracer, tracerOutline}
     }
 end
 
+--// Updates all visuals for a single player each frame
 local function UpdateVisuals(entry)
-    local visuals = entry.Visuals
     local player = entry.Player
+    if not player or not player.Character or not player.Character:FindFirstChild("Humanoid") or player.Character.Humanoid.Health <= 0 then
+        for category, objects in pairs(entry) do
+            if category ~= "Player" then
+                for _, obj in pairs(objects) do obj.Visible = false end
+            end
+        end
+        return
+    end
+
     local character = player.Character
-    local humanoid = character and character:FindFirstChild("Humanoid")
-    if not character or not humanoid or humanoid.Health <= 0 then
-        for _, obj in pairs(visuals.Box) do obj.Visible = false end
-        for _, obj in pairs(visuals.HealthBar) do obj.Visible = false end
-        for _, obj in pairs(visuals.Tracer) do obj.Visible = false end
-        return
-    end
-    if Environment.ESP.TeamCheck and player.Team == LocalPlayer.Team then
-        for _, obj in pairs(visuals.Box) do obj.Visible = false end
-        for _, obj in pairs(visuals.HealthBar) do obj.Visible = false end
-        for _, obj in pairs(visuals.Tracer) do obj.Visible = false end
-        return
-    end
-    local position, size, visible = CoreFunctions.CalculateBox(character)
-    if not visible then
-        for _, obj in pairs(visuals.Box) do obj.Visible = false end
-        for _, obj in pairs(visuals.HealthBar) do obj.Visible = false end
-        for _, obj in pairs(visuals.Tracer) do obj.Visible = false end
-        return
-    end
-    local color = Environment.ESP.UseTeamColor and player.TeamColor.Color or Environment.ESP.Color
-    local box, boxOutline, fillBox = unpack(visuals.Box)
-    box.Position = position
-    box.Size = size
-    box.Color = color
-    box.Transparency = Environment.Box.Transparency
-    box.Filled = false
-    box.Thickness = Environment.Box.Thickness
-    box.Visible = Environment.ESP.Enabled and Environment.Box.Enabled and visible
-    if Environment.Box.FillEnabled then
-        fillBox.Position = position
-        fillBox.Size = size
-        fillBox.Color = color
-        fillBox.Transparency = Environment.Box.FillTransparency
-        fillBox.Filled = true
-        fillBox.Visible = box.Visible
-    else
-        fillBox.Visible = false
-    end
-    if Environment.ESP.Outline then
-        boxOutline.Position = position
-        boxOutline.Size = size
-        boxOutline.Color = Color3fromRGB(0, 0, 0)
-        boxOutline.Thickness = Environment.Box.Thickness + 1
-        boxOutline.Transparency = Environment.Box.Transparency
-        boXoutline.Visible = box.Visible
-    else
-        boxOutline.Visible = false
-    end
-    if Environment.HealthBar.Enabled and Environment.ESP.Enabled then
-        local health = mathclamp(humanoid.Health, 0, humanoid.MaxHealth)
-        local ratio = health / humanoid.MaxHealth
-        local offset = Environment.HealthBar.Offset
-        local barHeight = size.Y
-        local barWidth = Environment.HealthBar.Thickness
-        local barX = position.X - offset
-        local healthBar, healthOutline = unpack(visuals.HealthBar)
-        healthBar.From = Vector2new(barX, position.Y + barHeight)
-        healthBar.To = Vector2new(barX, position.Y + barHeight - ratio * barHeight)
-        healthBar.Color = CoreFunctions.GetColorFromHealth(health, humanoid.MaxHealth)
-        healthBar.Thickness = barWidth
-        healthBar.Transparency = Environment.HealthBar.Transparency
-        healthBar.Visible = visible
-        if Environment.HealthBar.Outline then
-            healthOutline.From = Vector2new(barX, position.Y + barHeight + 1)
-            healthOutline.To = Vector2new(barX, position.Y - 1)
-            healthOutline.Color = Color3fromRGB(0, 0, 0)
-            healthOutline.Thickness = barWidth + 1
-            healthOutline.Transparency = Environment.HealthBar.Transparency
-            healthOutline.Visible = healthBar.Visible
-        else
-            healthOutline.Visible = false
-        end
-    else
-        for _, obj in pairs(visuals.HealthBar) do obj.Visible = false end
-    end
-    if Environment.Tracer.Enabled and Environment.ESP.Enabled then
-        local rootPart = character:FindFirstChild("HumanoidRootPart")
-        local head = character:FindFirstChild("Head")
-        if rootPart and head then
-            local HumPos, HumOnScreen = WorldToViewportPoint(rootPart.Position)
-            local headPos, headOnScreen = WorldToViewportPoint(head.Position)
-            if HumOnScreen and headOnScreen then
-                local DistanceY = (Vector2new(headPos.X, headPos.Y) - Vector2new(HumPos.X, HumPos.Y)).magnitude
-                DistanceY = mathclamp(DistanceY, 2, math.huge)
-                local toPos
-                if Environment.Tracer.Origin == "Top" then
-                    toPos = Vector2new(headPos.X, headPos.Y - DistanceY)
-                else
-                    toPos = Vector2new(HumPos.X, HumPos.Y + DistanceY * 2)
-                end
-                local fromPos
-                if Environment.Tracer.FollowMouse then
-                    fromPos = Vector2new(mouse.X, mouse.Y + 36)
-                else
-                    if Environment.Tracer.Origin == "Center" then
-                        fromPos = CurrentCamera.ViewportSize * 0.5
-                    elseif Environment.Tracer.Origin == "Top" then
-                        fromPos = Vector2new(CurrentCamera.ViewportSize.X * 0.5, 0)
-                    elseif Environment.Tracer.Origin == "Bottom" then
-                        fromPos = Vector2new(CurrentCamera.ViewportSize.X * 0.5, CurrentCamera.ViewportSize.Y)
-                    end
-                end
-                local tracer, blacktracer, blacktracer2 = unpack(visuals.Tracer)
-                tracer.From = fromPos
-                blacktracer.From = fromPos
-                blacktracer2.From = fromPos
-                tracer.To = toPos
-                blacktracer.To = Vector2new(toPos.X - Environment.Tracer.Thickness, toPos.Y)
-                blacktracer2.To = Vector2new(toPos.X + Environment.Tracer.Thickness, toPos.Y)
-                tracer.Color = color
-                tracer.Thickness = Environment.Tracer.Thickness
-                tracer.Transparency = 1
-                blacktracer.Thickness = Environment.Tracer.Thickness * 2
-                blacktracer.Transparency = 1
-                blacktracer2.Thickness = Environment.Tracer.Thickness * 2
-                blacktracer2.Transparency = 1
-                tracer.Visible = visible
-                blacktracer.Visible = Environment.ESP.Outline and tracer.Visible
-                blacktracer2.Visible = Environment.ESP.Outline and tracer.Visible
-            else
-                for _, obj in pairs(visuals.Tracer) do obj.Visible = false end
+    local humanoid = character.Humanoid
+    local rootPart = character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart
+    if not rootPart then return end
+
+    local headPosition, onScreen = WorldToViewportPoint(rootPart.Position + Vector3.new(0, 2, 0))
+    local footPosition, onScreen2 = WorldToViewportPoint(rootPart.Position - Vector3.new(0, 3, 0))
+
+    if not (onScreen and onScreen2) or not ESP.Settings.Enabled or (ESP.Settings.TeamCheck and player.Team == LocalPlayer.Team) then
+        for category, objects in pairs(entry) do
+            if category ~= "Player" then
+                for _, obj in pairs(objects) do obj.Visible = false end
             end
-        else
-            for _, obj in pairs(visuals.Tracer) do obj.Visible = false end
         end
-    else
-        for _, obj in pairs(visuals.Tracer) do obj.Visible = false end
+        return
+    end
+
+    local boxHeight = math.abs(headPosition.Y - footPosition.Y)
+    local boxWidth = boxHeight / 2
+    local boxPosition = Vector2.new(headPosition.X - boxWidth / 2, headPosition.Y)
+    local boxSize = Vector2.new(boxWidth, boxHeight)
+
+    -- Update 2D Box
+    local box, boxOutline, boxFill = unpack(entry.Box)
+    box.Visible = ESP.Box.Enabled
+    if ESP.Box.Enabled then
+        box.Position = boxPosition
+        box.Size = boxSize
+        box.Color = CoreFunctions.GetTeamColor(player)
+        box.Thickness = ESP.Box.Thickness
+        box.Transparency = ESP.Box.Transparency
+        box.Filled = false
+
+        boxOutline.Visible = ESP.Box.Outline
+        if ESP.Box.Outline then
+            boxOutline.Position = boxPosition - Vector2.new(1, 1)
+            boxOutline.Size = boxSize + Vector2.new(2, 2)
+            boxOutline.Color = ESP.Box.OutlineColor
+            boxOutline.Thickness = ESP.Box.Thickness
+            boxOutline.Transparency = ESP.Box.Transparency
+            boxOutline.Filled = false
+        end
+        
+        boxFill.Visible = ESP.Box.FillEnabled
+        if ESP.Box.FillEnabled then
+            boxFill.Position = boxPosition
+            boxFill.Size = boxSize
+            boxFill.Color = CoreFunctions.GetTeamColor(player)
+            boxFill.Transparency = ESP.Box.FillTransparency
+            boxFill.Filled = true
+        end
+    end
+
+    -- Update HealthBar
+    local healthBar, healthBarOutline = unpack(entry.HealthBar)
+    healthBar.Visible = ESP.HealthBar.Enabled
+    healthBarOutline.Visible = ESP.HealthBar.Enabled and ESP.HealthBar.Outline
+    if ESP.HealthBar.Enabled then
+        local healthRatio = math.clamp(humanoid.Health, 0, humanoid.MaxHealth) / humanoid.MaxHealth
+        local barStart = Vector2.new(boxPosition.X - ESP.HealthBar.Offset, boxPosition.Y + boxSize.Y)
+        local barEnd = Vector2.new(boxPosition.X - ESP.HealthBar.Offset, barStart.Y - (boxSize.Y * healthRatio))
+        
+        healthBar.From, healthBar.To = barStart, barEnd
+        healthBar.Color = CoreFunctions.GetHealthColor(humanoid.Health, humanoid.MaxHealth)
+        healthBar.Thickness = ESP.HealthBar.Thickness
+        healthBar.Transparency = ESP.HealthBar.Transparency
+        
+        if ESP.HealthBar.Outline then
+            local outlineThickness = ESP.HealthBar.Thickness + 2
+            healthBarOutline.From = Vector2.new(barStart.X, barStart.Y + 1)
+            healthBarOutline.To = Vector2.new(barEnd.X, barEnd.Y - 1)
+            healthBarOutline.Color = ESP.HealthBar.OutlineColor
+            healthBarOutline.Thickness = outlineThickness
+            healthBarOutline.Transparency = ESP.HealthBar.Transparency
+        end
+    end
+
+    -- Update Tracer
+    local tracer, tracerOutline = unpack(entry.Tracer)
+    tracer.Visible = ESP.Tracer.Enabled
+    tracerOutline.Visible = ESP.Tracer.Enabled and ESP.Tracer.Outline
+    if ESP.Tracer.Enabled then
+        local fromPos
+        if ESP.Tracer.Origin == "Top" then
+            fromPos = Vector2.new(CurrentCamera.ViewportSize.X / 2, 0)
+        elseif ESP.Tracer.Origin == "Center" then
+            fromPos = Vector2.new(CurrentCamera.ViewportSize.X / 2, CurrentCamera.ViewportSize.Y / 2)
+        else -- Bottom
+            fromPos = Vector2.new(CurrentCamera.ViewportSize.X / 2, CurrentCamera.ViewportSize.Y)
+        end
+        local toPos = Vector2.new(footPosition.X, footPosition.Y)
+
+        tracer.From, tracer.To = fromPos, toPos
+        tracer.Color = CoreFunctions.GetTeamColor(player)
+        tracer.Thickness = ESP.Tracer.Thickness
+        tracer.Transparency = ESP.Tracer.Transparency
+
+        if ESP.Tracer.Outline then
+            tracerOutline.From, tracerOutline.To = fromPos, toPos
+            tracerOutline.Color = ESP.Tracer.OutlineColor
+            tracerOutline.Thickness = ESP.Tracer.Thickness + 2
+            tracerOutline.Transparency = ESP.Tracer.Transparency
+        end
     end
 end
 
-local WrappedObjects = {}
-
-local function InitESP()
-    for _, player in ipairs(GetPlayers()) do
+--// Main initialization and event handling
+local function Initialize()
+    -- Initial players
+    for _, player in pairs(Players:GetPlayers()) do
         if player ~= LocalPlayer then
-            local entry = { Visuals = CreateVisuals(player), Player = player }
-            WrappedObjects[player] = entry
-            local connection
-            connection = RunService.RenderStepped:Connect(function()
-                if not WrappedObjects[player] then
-                    connection:Disconnect()
-                    return
-                end
-                UpdateVisuals(entry)
-            end)
+            ESP.WrappedObjects[player] = CreateVisuals(player)
         end
     end
-    Players.PlayerAdded:Connect(function(newPlayer)
-        if newPlayer == LocalPlayer then return end
-        local entry = { Visuals = CreateVisuals(newPlayer), Player = newPlayer }
-        WrappedObjects[newPlayer] = entry
-        local connection
-        connection = RunService.RenderStepped:Connect(function()
-            if not WrappedObjects[newPlayer] then
-                connection:Disconnect()
-                return
-            end
-            UpdateVisuals(entry)
-        end)
+
+    -- Handle players joining
+    Players.PlayerAdded:Connect(function(player)
+        if player ~= LocalPlayer then
+            ESP.WrappedObjects[player] = CreateVisuals(player)
+        end
     end)
-    Players.PlayerRemoving:Connect(function(leftPlayer)
-        local entry = WrappedObjects[leftPlayer]
-        if entry then
-            for _, obj in pairs(entry.Visuals.Box) do obj:Remove() end
-            for _, obj in pairs(entry.Visuals.HealthBar) do obj:Remove() end
-            for _, obj in pairs(entry.Visuals.Tracer) do obj:Remove() end
-            WrappedObjects[leftPlayer] = nil
+
+    -- Handle players leaving
+    Players.PlayerRemoving:Connect(function(player)
+        if ESP.WrappedObjects[player] then
+            for category, objects in pairs(ESP.WrappedObjects[player]) do
+                if category ~= "Player" then
+                    for _, obj in pairs(objects) do obj:Remove() end
+                end
+            end
+            ESP.WrappedObjects[player] = nil
+        end
+    end)
+
+    -- Main update loop
+    RunService.RenderStepped:Connect(function()
+        for player, entry in pairs(ESP.WrappedObjects) do
+            pcall(UpdateVisuals, entry)
         end
     end)
 end
 
-InitESP()
-
-_G._2DBoxEnabled = function() return Environment.ESP.Enabled and Environment.Box.Enabled end
-_G._HealthBarEnabled = function() return Environment.ESP.Enabled and Environment.HealthBar.Enabled end
-_G._TracerEnabled = function() return Environment.ESP.Enabled and Environment.Tracer.Enabled end
-
-return Environment
+Initialize()
+return ESP
