@@ -3,21 +3,19 @@ local Vector2new = Vector2.new
 local Drawingnew = Drawing.new
 local Color3fromRGB = Color3.fromRGB
 local mathfloor, mathabs, mathclamp = math.floor, math.abs, math.clamp
-local wait, spawn = task.wait, task.spawn
 local getgenv, cloneref = getgenv, cloneref or function(v) return v end
 local GameMetatable = getrawmetatable and getrawmetatable(game) or {}
 local __index = GameMetatable.__index or function(self, idx) return self[idx] end
 local __newindex = GameMetatable.__newindex or function(self, idx, val) self[idx] = val end
-local setrenderproperty = setrenderproperty or __newindex
 local Workspace = cloneref(game:GetService("Workspace"))
 local Players = cloneref(game:GetService("Players"))
 local RunService = cloneref(game:GetService("RunService"))
+local UserInputService = cloneref(game:GetService("UserInputService"))
 local CurrentCamera = __index(Workspace, "CurrentCamera")
 local LocalPlayer = __index(Players, "LocalPlayer")
 local WorldToViewportPoint = function(...) return CurrentCamera.WorldToViewportPoint(CurrentCamera, ...) end
 local GetPlayers = function() return Players:GetPlayers() end
-local GetPlayerFromCharacter = function(...) return Players:GetPlayerFromCharacter(...) end
-local IsDescendantOf = function(self, parent) return self:IsDescendantOf(parent) end
+
 getgenv().SimpleESP = {
     Settings = {
         Enabled = false,
@@ -44,8 +42,16 @@ getgenv().SimpleESP = {
         OutlineColor = Color3fromRGB(0, 0, 0),
         Outline = true
     },
+    Tracer = {
+        Enabled = false,
+        Thickness = 1,
+        Origin = "Bottom",
+        FollowMouse = false,
+        Outline = true
+    },
     WrappedObjects = {}
 }
+
 local Environment = getgenv().SimpleESP
 local CoreFunctions = {
     GetColorFromHealth = function(health, max)
@@ -84,73 +90,89 @@ local CoreFunctions = {
         return Environment.Box.Color
     end
 }
+
 local function CreateVisuals(player)
     local fillBox = Drawingnew("Square")
     local boxOutline = Drawingnew("Square")
     local box = Drawingnew("Square")
     local healthOutline = Drawingnew("Line")
     local healthBar = Drawingnew("Line")
+    local tracer = Drawingnew("Line")
+    local tracerOutline = Drawingnew("Line")
+    
     box.Visible = false
     boxOutline.Visible = false
     fillBox.Visible = false
     healthBar.Visible = false
     healthOutline.Visible = false
-    return {Box = {box, boxOutline, fillBox}, HealthBar = {healthBar, healthOutline}, Player = player}
+    tracer.Visible = false
+    tracerOutline.Visible = false
+
+    return {Box = {box, boxOutline, fillBox}, HealthBar = {healthBar, healthOutline}, Tracer = {tracer, tracerOutline}, Player = player}
 end
+
 local function UpdateVisuals(entry)
     local visuals = entry.Visuals
     local player = entry.Player
     local character = player.Character
     local humanoid = character and character:FindFirstChild("Humanoid")
-    if Environment.Settings.HideTeam and player.Team == LocalPlayer.Team then
-        for _, obj in pairs(visuals.Box) do obj.Visible = false end
-        for _, obj in pairs(visuals.HealthBar) do obj.Visible = false end
+    local espEnabled = Environment.Settings.Enabled
+
+    local function setVisible(vis)
+        for _, obj in pairs(visuals.Box) do obj.Visible = vis end
+        for _, obj in pairs(visuals.HealthBar) do obj.Visible = vis end
+        for _, obj in pairs(visuals.Tracer) do obj.Visible = vis end
+    end
+
+    if not espEnabled or (Environment.Settings.HideTeam and player.Team == LocalPlayer.Team) or not character or not humanoid or (Environment.Settings.AliveCheck and humanoid.Health <= 0) then
+        setVisible(false)
         return
     end
-    if not character or not humanoid or (Environment.Settings.AliveCheck and humanoid.Health <= 0) then
-        for _, obj in pairs(visuals.Box) do obj.Visible = false end
-        for _, obj in pairs(visuals.HealthBar) do obj.Visible = false end
-        return
-    end
+
     local position, size, visible = CoreFunctions.CalculateBox(character)
-    if not visible then
-        for _, obj in pairs(visuals.Box) do obj.Visible = false end
-        for _, obj in pairs(visuals.HealthBar) do obj.Visible = false end
-        return
-    end
     local box, boxOutline, fillBox = unpack(visuals.Box)
     local healthBar, healthOutline = unpack(visuals.HealthBar)
-    local espEnabled = Environment.Settings.Enabled
+    local tracer, tracerOutline = unpack(visuals.Tracer)
+    local espColor = CoreFunctions.GetTeamColor(player)
+
+    if not visible then
+        setVisible(false)
+        return
+    end
+
     local boxEnabled = Environment.Box.Enabled
     box.Position = position
     box.Size = size
-    box.Color = CoreFunctions.GetTeamColor(player)
+    box.Color = espColor
     box.Transparency = Environment.Box.Transparency
     box.Filled = false
     box.Thickness = Environment.Box.Thickness
-    box.Visible = espEnabled and boxEnabled and visible
+    box.Visible = boxEnabled
+
     if Environment.Box.FillEnabled then
         fillBox.Position = position
         fillBox.Size = size
-        fillBox.Color = CoreFunctions.GetTeamColor(player)
+        fillBox.Color = espColor
         fillBox.Transparency = Environment.Box.FillTransparency
         fillBox.Filled = true
-        fillBox.Visible = espEnabled and boxEnabled and visible
+        fillBox.Visible = boxEnabled
     else
         fillBox.Visible = false
     end
+
     if Environment.Box.Outline then
         boxOutline.Position = position
         boxOutline.Size = size
         boxOutline.Color = Environment.Box.OutlineColor
         boxOutline.Thickness = Environment.Box.Thickness + 1
         boxOutline.Transparency = Environment.Box.Transparency
-        boxOutline.Visible = espEnabled and boxEnabled and visible
+        boxOutline.Visible = boxEnabled
     else
         boxOutline.Visible = false
     end
+
     if Environment.HealthBar.Enabled then
-        local health = math.clamp(humanoid.Health, 0, humanoid.MaxHealth)
+        local health = mathclamp(humanoid.Health, 0, humanoid.MaxHealth)
         local ratio = health / humanoid.MaxHealth
         local offset = Environment.HealthBar.Offset
         local barHeight = size.Y
@@ -161,14 +183,14 @@ local function UpdateVisuals(entry)
         healthBar.Color = CoreFunctions.GetColorFromHealth(health, humanoid.MaxHealth)
         healthBar.Thickness = barWidth
         healthBar.Transparency = Environment.HealthBar.Transparency
-        healthBar.Visible = espEnabled and visible
+        healthBar.Visible = true
         if Environment.HealthBar.Outline then
             healthOutline.From = Vector2new(barX, position.Y + barHeight + 1)
             healthOutline.To = Vector2new(barX, position.Y - 1)
             healthOutline.Color = Environment.HealthBar.OutlineColor
             healthOutline.Thickness = barWidth + 1
             healthOutline.Transparency = Environment.HealthBar.Transparency
-            healthOutline.Visible = espEnabled and visible
+            healthOutline.Visible = true
         else
             healthOutline.Visible = false
         end
@@ -176,7 +198,66 @@ local function UpdateVisuals(entry)
         healthBar.Visible = false
         healthOutline.Visible = false
     end
+
+    if Environment.Tracer.Enabled then
+        local fromPos
+        if Environment.Tracer.FollowMouse then
+            local mouseLocation = UserInputService:GetMouseLocation()
+            fromPos = Vector2new(mouseLocation.X, mouseLocation.Y)
+        else
+            if Environment.Tracer.Origin == "Center" then
+                fromPos = CurrentCamera.ViewportSize * 0.5
+            elseif Environment.Tracer.Origin == "Top" then
+                fromPos = Vector2new(CurrentCamera.ViewportSize.X * 0.5, 0)
+            else
+                fromPos = Vector2new(CurrentCamera.ViewportSize.X * 0.5, CurrentCamera.ViewportSize.Y)
+            end
+        end
+
+        local toPos
+        if box.Visible then
+            if Environment.Tracer.Origin == "Top" then
+                toPos = Vector2new(position.X + size.X / 2, position.Y)
+            else
+                toPos = Vector2new(position.X + size.X / 2, position.Y + size.Y)
+            end
+        else
+            local rootPart = character:FindFirstChild("HumanoidRootPart")
+            if rootPart then
+                local screenPos, onScreen = WorldToViewportPoint(rootPart.Position)
+                if onScreen then
+                    toPos = Vector2new(screenPos.X, screenPos.Y)
+                else
+                    setVisible(false)
+                    return
+                end
+            else
+                setVisible(false)
+                return
+            end
+        end
+
+        tracer.Color = espColor
+        tracer.Thickness = Environment.Tracer.Thickness
+        tracer.From = fromPos
+        tracer.To = toPos
+        tracer.Visible = true
+
+        if Environment.Tracer.Outline then
+            tracerOutline.Color = Color3fromRGB(0, 0, 0)
+            tracerOutline.Thickness = Environment.Tracer.Thickness + 1
+            tracerOutline.From = fromPos
+            tracerOutline.To = toPos
+            tracerOutline.Visible = true
+        else
+            tracerOutline.Visible = false
+        end
+    else
+        tracer.Visible = false
+        tracerOutline.Visible = false
+    end
 end
+
 local function InitESP()
     for _, player in ipairs(GetPlayers()) do
         if player ~= LocalPlayer then
@@ -208,12 +289,18 @@ local function InitESP()
     Players.PlayerRemoving:Connect(function(leftPlayer)
         local entry = Environment.WrappedObjects[leftPlayer]
         if entry then
-            for _, obj in pairs(entry.Visuals.Box) do obj:Remove() end
-            for _, obj in pairs(entry.Visuals.HealthBar) do obj:Remove() end
+            for _, visualGroup in pairs(entry.Visuals) do
+                if typeof(visualGroup) == "table" then
+                    for _, obj in pairs(visualGroup) do
+                        obj:Remove()
+                    end
+                end
+            end
             Environment.WrappedObjects[leftPlayer] = nil
         end
     end)
 end
+
 InitESP()
 _G_ESPEnabled = function(state) Environment.Settings.Enabled = state end
 _G_BoxEnabled = function(state) Environment.Box.Enabled = state end
@@ -223,4 +310,6 @@ _G_HealthBarEnabled = function(state) Environment.HealthBar.Enabled = state end
 _G_TeamColorEnabled = function(state) Environment.Settings.TeamColorEnabled = state end
 _G_HideTeam = function(state) Environment.Settings.HideTeam = state end
 _G_SetESPColor = function(color) Environment.Box.Color = color end
+_G_TracerEnabled = function(state) Environment.Tracer.Enabled = state end
+_G_TracerOrigin = function(option) Environment.Tracer.Origin = option end
 return Environment
