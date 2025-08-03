@@ -214,7 +214,7 @@ local function UpdateVisuals(entry)
             fromPos = Vector2new(mouse.X, mouse.Y + 36)
         end
         local toPos
-        if Environment.Box.Enabled and box.Visible then
+        if Environment.Box.Enabled and boxEnabled and visible then
             toPos = Vector2new(position.X + size.X / 2, position.Y + size.Y)
         else
             local HumPos = WorldToViewportPoint(character.HumanoidRootPart.Position)
@@ -226,28 +226,25 @@ local function UpdateVisuals(entry)
                 toPos = Vector2new(HumPos.X, HumPos.Y + DistanceY * 2)
             end
         end
+        local tracerTransparency = Environment.Box.Enabled and boxEnabled and visible and Environment.Box.Transparency or Environment.Tracer.Transparency
         tracer.From = fromPos
         tracer.To = toPos
         tracer.Color = CoreFunctions.GetTracerColor(player)
         tracer.Thickness = Environment.Tracer.Thickness
-        tracer.Transparency = Environment.Tracer.Transparency
+        tracer.Transparency = tracerTransparency
         tracer.Visible = espEnabled and visible
-        local outlineTransparency = Environment.Tracer.Transparency
-        if Environment.Box.Enabled and box.Visible then
-            outlineTransparency = Environment.Box.Transparency
-        end
         if Environment.Tracer.Outline then
             tracerOutline1.From = fromPos
             tracerOutline1.To = Vector2new(toPos.X - Environment.Tracer.Thickness, toPos.Y)
             tracerOutline1.Color = Environment.Tracer.OutlineColor
             tracerOutline1.Thickness = Environment.Tracer.Thickness * 2
-            tracerOutline1.Transparency = outlineTransparency
+            tracerOutline1.Transparency = tracerTransparency
             tracerOutline1.Visible = espEnabled and visible
             tracerOutline2.From = fromPos
             tracerOutline2.To = Vector2new(toPos.X + Environment.Tracer.Thickness, toPos.Y)
             tracerOutline2.Color = Environment.Tracer.OutlineColor
             tracerOutline2.Thickness = Environment.Tracer.Thickness * 2
-            tracerOutline2.Transparency = outlineTransparency
+            tracerOutline2.Transparency = tracerTransparency
             tracerOutline2.Visible = espEnabled and visible
         else
             tracerOutline1.Visible = false
