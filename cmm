@@ -34,7 +34,6 @@ getgenv().SimpleESP = {
         Thickness = 1,
         OutlineColor = Color3fromRGB(0, 0, 0),
         Outline = false,
-        OutlineThickness = 2,
         FillEnabled = false,
         FillTransparency = 0.5
     },
@@ -292,7 +291,9 @@ local function CreateVisuals(player)
     local box3d = {}
     for i = 1, 12 do
         box3d["box_line" .. i] = Drawingnew("Line")
+        box3d["box_line" .. i].ZIndex = 2
         box3d["box_line_black" .. i] = Drawingnew("Line")
+        box3d["box_line_black" .. i].ZIndex = 1
     end
     for i = 1, 6 do
         box3d["box_quad" .. i] = Drawingnew("Quad")
@@ -401,7 +402,7 @@ local function UpdateVisuals(entry)
             box3d.box_line_black11.To = Vector2.new(Top3.X, Top3.Y)
             box3d.box_line_black12.From = Vector2.new(Bottom4.X, Bottom4.Y)
             box3d.box_line_black12.To = Vector2.new(Top4.X, Top4.Y)
-                        if Environment.Box.FillEnabled then
+            if Environment.Box.FillEnabled then
                 box3d.box_quad1.PointA = Vector2.new(Bottom1.X, Bottom1.Y)
                 box3d.box_quad1.PointB = Vector2.new(Bottom2.X, Bottom2.Y)
                 box3d.box_quad1.PointC = Vector2.new(Bottom3.X, Bottom3.Y)
@@ -433,7 +434,7 @@ local function UpdateVisuals(entry)
                 box3d["box_line" .. i].Thickness = Environment.Box.Thickness
                 box3d["box_line_black" .. i].Visible = Environment.Box.Outline
                 box3d["box_line_black" .. i].Color = Environment.Box.OutlineColor
-                box3d["box_line_black" .. i].Thickness = Environment.Box.OutlineThickness
+                box3d["box_line_black" .. i].Thickness = Environment.Box.Thickness + 1
             end
             for i = 1, 6 do
                 box3d["box_quad" .. i].Visible = Environment.Box.FillEnabled
