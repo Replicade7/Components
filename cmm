@@ -35,7 +35,10 @@ getgenv().SimpleESP = {
         OutlineColor = Color3fromRGB(0, 0, 0),
         Outline = false,
         FillEnabled = false,
-        FillTransparency = 0.5
+        FillTransparency = 0.5,
+        CornerLineWidth = 0.25,
+        CornerLineHeight = 0.2,
+        CornerLineOffset = 0.001
     },
     HealthBar = {
         Enabled = false,
@@ -299,16 +302,17 @@ local function CreateVisuals(player)
         box3d["box_quad" .. i] = Drawingnew("Quad")
     end
     local cornerBox = {
-        boxLines = {},
-        fillBox = Drawingnew("Square", {
-            Thickness = 1,
-            Filled = true,
-            Visible = false,
-            ZIndex = 0
-        })
+        fillBox = Drawingnew("Square"),
+        boxLines = {}
     }
+    cornerBox.fillBox.Visible = false
+    cornerBox.fillBox.Filled = true
+    cornerBox.fillBox.Thickness = 1
+    cornerBox.fillBox.ZIndex = 0
     for i = 1, 16 do
-        cornerBox.boxLines[i] = Drawingnew("Line", { Visible = false })
+        cornerBox.boxLines[i] = Drawingnew("Line")
+        cornerBox.boxLines[i].Thickness = Environment.Box.Thickness
+        cornerBox.boxLines[i].ZIndex = i <= 8 and 1 or 2
     end
     return {Box = {box, boxOutline, fillBox}, HealthBar = {healthBar, healthOutline}, Tracer = {tracer, tracerOutline1, tracerOutline2}, Name = name, Distance = distance, Player = player, Box3D = box3d, CornerBox = cornerBox}
 end
@@ -323,7 +327,7 @@ local function UpdateVisuals(entry)
         for _, obj in pairs(visuals.Tracer) do obj.Visible = false end
         for _, obj in pairs(visuals.Box3D) do obj.Visible = false end
         for _, obj in pairs(visuals.CornerBox.boxLines) do obj.Visible = false end
-        if visuals.CornerBox.fillBox then visuals.CornerBox.fillBox.Visible = false end
+        visuals.CornerBox.fillBox.Visible = false
         visuals.Name.Visible = false
         visuals.Distance.Visible = false
         return
@@ -334,7 +338,7 @@ local function UpdateVisuals(entry)
         for _, obj in pairs(visuals.Tracer) do obj.Visible = false end
         for _, obj in pairs(visuals.Box3D) do obj.Visible = false end
         for _, obj in pairs(visuals.CornerBox.boxLines) do obj.Visible = false end
-        if visuals.CornerBox.fillBox then visuals.CornerBox.fillBox.Visible = false end
+        visuals.CornerBox.fillBox.Visible = false
         visuals.Name.Visible = false
         visuals.Distance.Visible = false
         return
@@ -346,7 +350,7 @@ local function UpdateVisuals(entry)
         for _, obj in pairs(visuals.Tracer) do obj.Visible = false end
         for _, obj in pairs(visuals.Box3D) do obj.Visible = false end
         for _, obj in pairs(visuals.CornerBox.boxLines) do obj.Visible = false end
-        if visuals.CornerBox.fillBox then visuals.CornerBox.fillBox.Visible = false end
+        visuals.CornerBox.fillBox.Visible = false
         visuals.Name.Visible = false
         visuals.Distance.Visible = false
         return
@@ -355,12 +359,13 @@ local function UpdateVisuals(entry)
     local healthBar, healthOutline = unpack(visuals.HealthBar)
     local tracer, tracerOutline1, tracerOutline2 = unpack(visuals.Tracer)
     local name, distance_obj = visuals.Name, visuals.Distance
+    local cornerBox = visuals.CornerBox
     local espEnabled = Environment.Settings.Enabled
     local boxEnabled = Environment.Box.Enabled
     if Environment.Box.ViewBox == "3D" then
         for _, obj in pairs(visuals.Box) do obj.Visible = false end
-        for _, obj in pairs(visuals.CornerBox.boxLines) do obj.Visible = false end
-        if visuals.CornerBox.fillBox then visuals.CornerBox.fillBox.Visible = false end
+        for _, obj in pairs(cornerBox.boxLines) do obj.Visible = false end
+        cornerBox.fillBox.Visible = false
         local hrp = character.HumanoidRootPart
         local hrpPos, onScreen = CurrentCamera:WorldToViewportPoint(hrp.Position)
         if onScreen and boxEnabled and espEnabled then
@@ -468,80 +473,52 @@ local function UpdateVisuals(entry)
     elseif Environment.Box.ViewBox == "Corner" then
         for _, obj in pairs(visuals.Box) do obj.Visible = false end
         for _, obj in pairs(visuals.Box3D) do obj.Visible = false end
-        local cornerBox = visuals.CornerBox
-        local esp = cornerBox
-        local character, team = player.Character, player.Team
-        if character and (not Environment.Settings.HideTeam or (team and team ~= LocalPlayer.Team)) then
-            local rootPart = character:FindFirstChild("HumanoidRootPart")
-            local humanoid = character:FindFirstChild("Humanoid")
-            local shouldShow = Environment.Settings.Enabled and humanoid and humanoid.Health > 0
-            if rootPart and shouldShow then
-                local boxColor = CoreFunctions.GetTeamColor(player)
-                esp.fillBox.Position = position
-                esp.fillBox.Size = size
-                esp.fillBox.Color = boxColor
-                esp.fillBox.Transparency = Environment.Box.FillTransparency
-                esp.fillBox.Visible = Environment.Box.FillEnabled and espEnabled and boxEnabled
-                local lineW = size.X * 0.25
-                local lineH = size.Y * 0.2
-                local vertOffset = size.Y * 0.001
-                local lines = esp.boxLines
-                for i = 1, 16 do
-                    if i <= 8 then
-                        lines[i].Thickness = Environment.Box.Thickness + 1
-                        lines[i].Color = Environment.Box.OutlineColor
-                        lines[i].ZIndex = 1
-                        lines[i].Transparency = Environment.Box.Outline and 0 or 1
-                    else
-                        lines[i].Thickness = Environment.Box.Thickness
-                        lines[i].Color = boxColor
-                        lines[i].ZIndex = 2
-                        lines[i].Transparency = 0
-                    end
-                end
-                lines[1].From = Vector2.new(position.X, position.Y)
-                lines[1].To = Vector2.new(position.X + lineW, position.Y)
-                lines[2].From = Vector2.new(position.X, position.Y - vertOffset)
-                lines[2].To = Vector2.new(position.X, position.Y - vertOffset + lineH)
-                lines[3].From = Vector2.new(position.X + size.X - lineW, position.Y)
-                lines[3].To = Vector2.new(position.X + size.X, position.Y)
-                lines[4].From = Vector2.new(position.X + size.X, position.Y - vertOffset)
-                lines[4].To = Vector2.new(position.X + size.X, position.Y - vertOffset + lineH)
-                lines[5].From = Vector2.new(position.X, position.Y + size.Y - lineH - vertOffset)
-                lines[5].To = Vector2.new(position.X, position.Y + size.Y - vertOffset)
-                lines[6].From = Vector2.new(position.X, position.Y + size.Y)
-                lines[6].To = Vector2.new(position.X + lineW, position.Y + size.Y)
-                lines[7].From = Vector2.new(position.X + size.X - lineW, position.Y + size.Y)
-                lines[7].To = Vector2.new(position.X + size.X, position.Y + size.Y)
-                lines[8].From = Vector2.new(position.X + size.X, position.Y + size.Y - lineH - vertOffset)
-                lines[8].To = Vector2.new(position.X + size.X, position.Y + size.Y - vertOffset)
-                for i = 9, 16 do
-                    lines[i].From = lines[i-8].From
-                    lines[i].To = lines[i-8].To
-                end
-                for _, line in ipairs(lines) do
-                    line.Visible = espEnabled and boxEnabled
-                end
-            else
-                for _, line in ipairs(esp.boxLines) do
-                    line.Visible = false
-                end
-                if esp.fillBox then
-                    esp.fillBox.Visible = false
-                end
-            end
-        else
-            for _, line in ipairs(esp.boxLines) do
-                line.Visible = false
-            end
-            if esp.fillBox then
-                esp.fillBox.Visible = false
-            end
+        local color = CoreFunctions.GetTeamColor(player)
+        cornerBox.fillBox.Position = position
+        cornerBox.fillBox.Size = size
+        cornerBox.fillBox.Color = color
+        cornerBox.fillBox.Transparency = Environment.Box.FillTransparency
+        cornerBox.fillBox.Visible = Environment.Box.FillEnabled and espEnabled and boxEnabled
+        local lineW = size.X * Environment.Box.CornerLineWidth
+        local lineH = size.Y * Environment.Box.CornerLineHeight
+        local vertOffset = size.Y * Environment.Box.CornerLineOffset
+        local lines = cornerBox.boxLines
+        lines[1].From = Vector2.new(position.X, position.Y)
+        lines[1].To = Vector2.new(position.X + lineW, position.Y)
+        lines[2].From = Vector2.new(position.X, position.Y - vertOffset)
+        lines[2].To = Vector2.new(position.X, position.Y - vertOffset + lineH)
+        lines[3].From = Vector2.new(position.X + size.X - lineW, position.Y)
+        lines[3].To = Vector2.new(position.X + size.X, position.Y)
+        lines[4].From = Vector2.new(position.X + size.X, position.Y - vertOffset)
+        lines[4].To = Vector2.new(position.X + size.X, position.Y - vertOffset + lineH)
+        lines[5].From = Vector2.new(position.X, position.Y + size.Y - lineH - vertOffset)
+        lines[5].To = Vector2.new(position.X, position.Y + size.Y - vertOffset)
+        lines[6].From = Vector2.new(position.X, position.Y + size.Y)
+        lines[6].To = Vector2.new(position.X + lineW, position.Y + size.Y)
+        lines[7].From = Vector2.new(position.X + size.X - lineW, position.Y + size.Y)
+        lines[7].To = Vector2.new(position.X + size.X, position.Y + size.Y)
+        lines[8].From = Vector2.new(position.X + size.X, position.Y + size.Y - lineH - vertOffset)
+        lines[8].To = Vector2.new(position.X + size.X, position.Y + size.Y - vertOffset)
+        for i = 9, 16 do
+            lines[i].From = lines[i-8].From
+            lines[i].To = lines[i-8].To
+        end
+        for i = 1, 8 do
+            lines[i].Color = Color3.new(0, 0, 0)
+            lines[i].Thickness = Environment.Box.Thickness + 1
+            lines[i].Transparency = 0.5
+            lines[i].Visible = Environment.Box.Outline
+        end
+        for i = 9, 16 do
+            lines[i].Color = color
+            lines[i].Thickness = Environment.Box.Thickness
+            lines[i].Transparency = Environment.Box.Transparency
+            lines[i].Visible = espEnabled and boxEnabled
         end
     else
+        for _, obj in pairs(cornerBox.boxLines) do obj.Visible = false end
+        cornerBox.fillBox.Visible = false
         for _, obj in pairs(visuals.Box3D) do obj.Visible = false end
-        for _, obj in pairs(visuals.CornerBox.boxLines) do obj.Visible = false end
-        if visuals.CornerBox.fillBox then visuals.CornerBox.fillBox.Visible = false end
         box.Position = position
         box.Size = size
         box.Color = CoreFunctions.GetTeamColor(player)
@@ -891,7 +868,7 @@ local function InitESP()
             for _, obj in pairs(entry.Visuals.Tracer) do obj:Remove() end
             for _, obj in pairs(entry.Visuals.Box3D) do obj:Remove() end
             for _, obj in pairs(entry.Visuals.CornerBox.boxLines) do obj:Remove() end
-            if entry.Visuals.CornerBox.fillBox then entry.Visuals.CornerBox.fillBox:Remove() end
+            entry.Visuals.CornerBox.fillBox:Remove()
             entry.Visuals.Name:Remove()
             entry.Visuals.Distance:Remove()
             Environment.WrappedObjects[leftPlayer] = nil
