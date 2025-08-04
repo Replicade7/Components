@@ -66,6 +66,20 @@ getgenv().SimpleESP = {
         Transparency = 0,
         Outline = true
     },
+    Name = {
+        Enabled = false,
+        Color = Color3fromRGB(255, 255, 255),
+        Outline = true,
+        Size = 13,
+        Font = 2
+    },
+    Distance = {
+        Enabled = false,
+        Color = Color3fromRGB(255, 255, 255),
+        Outline = true,
+        Size = 12,
+        Font = 2
+    },
     WrappedObjects = {}
 }
 local Environment = getgenv().SimpleESP
@@ -247,6 +261,8 @@ local function CreateVisuals(player)
     local tracerOutline1 = Drawingnew("Line")
     local tracerOutline2 = Drawingnew("Line")
     local tracer = Drawingnew("Line")
+    local nameText = Drawingnew("Text")
+    local distanceText = Drawingnew("Text")
     box.Visible = false
     boxOutline.Visible = false
     fillBox.Visible = false
@@ -255,7 +271,16 @@ local function CreateVisuals(player)
     tracer.Visible = false
     tracerOutline1.Visible = false
     tracerOutline2.Visible = false
-    return {Box = {box, boxOutline, fillBox}, HealthBar = {healthBar, healthOutline}, Tracer = {tracer, tracerOutline1, tracerOutline2}, Player = player}
+    nameText.Visible = false
+    distanceText.Visible = false
+    return {
+        Box = {box, boxOutline, fillBox}, 
+        HealthBar = {healthBar, healthOutline}, 
+        Tracer = {tracer, tracerOutline1, tracerOutline2},
+        Name = {nameText},
+        Distance = {distanceText},
+        Player = player
+    }
 end
 local function UpdateVisuals(entry)
     local visuals = entry.Visuals
@@ -266,12 +291,16 @@ local function UpdateVisuals(entry)
         for _, obj in pairs(visuals.Box) do obj.Visible = false end
         for _, obj in pairs(visuals.HealthBar) do obj.Visible = false end
         for _, obj in pairs(visuals.Tracer) do obj.Visible = false end
+        for _, obj in pairs(visuals.Name) do obj.Visible = false end
+        for _, obj in pairs(visuals.Distance) do obj.Visible = false end
         return
     end
     if not character or not humanoid or (Environment.Settings.AliveCheck and humanoid.Health <= 0) then
         for _, obj in pairs(visuals.Box) do obj.Visible = false end
         for _, obj in pairs(visuals.HealthBar) do obj.Visible = false end
         for _, obj in pairs(visuals.Tracer) do obj.Visible = false end
+        for _, obj in pairs(visuals.Name) do obj.Visible = false end
+        for _, obj in pairs(visuals.Distance) do obj.Visible = false end
         return
     end
     local position, size, visible = CoreFunctions.CalculateBox(character)
@@ -279,11 +308,15 @@ local function UpdateVisuals(entry)
         for _, obj in pairs(visuals.Box) do obj.Visible = false end
         for _, obj in pairs(visuals.HealthBar) do obj.Visible = false end
         for _, obj in pairs(visuals.Tracer) do obj.Visible = false end
+        for _, obj in pairs(visuals.Name) do obj.Visible = false end
+        for _, obj in pairs(visuals.Distance) do obj.Visible = false end
         return
     end
     local box, boxOutline, fillBox = unpack(visuals.Box)
     local healthBar, healthOutline = unpack(visuals.HealthBar)
     local tracer, tracerOutline1, tracerOutline2 = unpack(visuals.Tracer)
+    local nameText = unpack(visuals.Name)
+    local distanceText = unpack(visuals.Distance)
     local espEnabled = Environment.Settings.Enabled
     local boxEnabled = Environment.Box.Enabled
     box.Position = position
@@ -396,6 +429,52 @@ local function UpdateVisuals(entry)
         tracer.Visible = false
         tracerOutline1.Visible = false
         tracerOutline2.Visible = false
+    end
+    if Environment.Name.Enabled and espEnabled and visible then
+        local head = character:FindFirstChild("Head")
+        if head then
+            local headPos = WorldToViewportPoint(head.Position)
+            local screenPos = Vector2.new(headPos.X, headPos.Y - 20)
+            nameText.Text = player.Name
+            nameText.Position = screenPos
+            nameText.Font = Environment.Name.Font
+            nameText.Size = Environment.Name.Size
+            nameText.Center = true
+            nameText.Outline = Environment.Name.Outline
+            nameText.OutlineColor = Color3fromRGB(0, 0, 0)
+            nameText.Color = Environment.Settings.TeamColorEnabled and player.TeamColor and player.TeamColor.Color or Environment.Name.Color
+            nameText.Visible = true
+        else
+            nameText.Visible = false
+        end
+    else
+        nameText.Visible = false
+    end
+    if Environment.Distance.Enabled and espEnabled and visible then
+        local head = character:FindFirstChild("Head")
+        if head then
+            local rootPart = character:FindFirstChild("HumanoidRootPart")
+            if rootPart then
+                local headPos = WorldToViewportPoint(head.Position)
+                local screenPos = Vector2.new(headPos.X, headPos.Y + 15)
+                local distance = (CurrentCamera.CFrame.Position - rootPart.Position).Magnitude
+                distanceText.Text = string.format("[%dm]", math.floor(distance))
+                distanceText.Position = screenPos
+                distanceText.Font = Environment.Distance.Font
+                distanceText.Size = Environment.Distance.Size
+                distanceText.Center = true
+                distanceText.Outline = Environment.Distance.Outline
+                distanceText.OutlineColor = Color3fromRGB(0, 0, 0)
+                distanceText.Color = Environment.Settings.TeamColorEnabled and player.TeamColor and player.TeamColor.Color or Environment.Distance.Color
+                distanceText.Visible = true
+            else
+                distanceText.Visible = false
+            end
+        else
+            distanceText.Visible = false
+        end
+    else
+        distanceText.Visible = false
     end
 end
 local SkeletonESP = {}
@@ -614,6 +693,8 @@ local function InitESP()
             for _, obj in pairs(entry.Visuals.Box) do obj:Remove() end
             for _, obj in pairs(entry.Visuals.HealthBar) do obj:Remove() end
             for _, obj in pairs(entry.Visuals.Tracer) do obj:Remove() end
+            for _, obj in pairs(entry.Visuals.Name) do obj:Remove() end
+            for _, obj in pairs(entry.Visuals.Distance) do obj:Remove() end
             Environment.WrappedObjects[leftPlayer] = nil
         end
     end)
@@ -634,7 +715,11 @@ Players.PlayerRemoving:Connect(function(plr)
 end)
 _G_ESPEnabled = function(state) Environment.Settings.Enabled = state end
 _G_BoxEnabled = function(state) Environment.Box.Enabled = state end
-_G_OutlineEnabled = function(state) Environment.Box.Outline = state end
+_G_OutlineEnabled = function(state) 
+    Environment.Box.Outline = state
+    Environment.Name.Outline = state
+    Environment.Distance.Outline = state
+end
 _G_FillBoxEnabled = function(state) Environment.Box.FillEnabled = state end
 _G_HealthBarEnabled = function(state) Environment.HealthBar.Enabled = state end
 _G_TeamColorEnabled = function(state) Environment.Settings.TeamColorEnabled = state end
@@ -644,6 +729,8 @@ _G_SetESPColor = function(color)
     Environment.Tracer.Color = color
     Environment.Skeleton.Color = color
     Environment.Arrows.Color = color
+    Environment.Name.Color = color
+    Environment.Distance.Color = color
 end
 _G_TracerEnabled = function(state) Environment.Tracer.Enabled = state end
 _G_TracerOutlineEnabled = function(state) Environment.Tracer.Outline = state end
