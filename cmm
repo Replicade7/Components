@@ -28,6 +28,7 @@ getgenv().SimpleESP = {
     },
     Box = {
         Enabled = false,
+        ViewBox = "2D",
         Color = Color3fromRGB(255, 255, 255),
         Transparency = 1,
         Thickness = 1,
@@ -287,7 +288,15 @@ local function CreateVisuals(player)
     distance.Center = true
     distance.Size = Environment.Pdistance.Size
     distance.Visible = false
-    return {Box = {box, boxOutline, fillBox}, HealthBar = {healthBar, healthOutline}, Tracer = {tracer, tracerOutline1, tracerOutline2}, Name = name, Distance = distance, Player = player}
+    local box3d = {}
+    for i = 1, 12 do
+        box3d["box_line" .. i] = Drawingnew("Line")
+        box3d["box_line_black" .. i] = Drawingnew("Line")
+    end
+    for i = 1, 6 do
+        box3d["box_quad" .. i] = Drawingnew("Quad")
+    end
+    return {Box = {box, boxOutline, fillBox}, HealthBar = {healthBar, healthOutline}, Tracer = {tracer, tracerOutline1, tracerOutline2}, Name = name, Distance = distance, Player = player, Box3D = box3d}
 end
 local function UpdateVisuals(entry)
     local visuals = entry.Visuals
@@ -298,6 +307,7 @@ local function UpdateVisuals(entry)
         for _, obj in pairs(visuals.Box) do obj.Visible = false end
         for _, obj in pairs(visuals.HealthBar) do obj.Visible = false end
         for _, obj in pairs(visuals.Tracer) do obj.Visible = false end
+        for _, obj in pairs(visuals.Box3D) do obj.Visible = false end
         visuals.Name.Visible = false
         visuals.Distance.Visible = false
         return
@@ -306,6 +316,7 @@ local function UpdateVisuals(entry)
         for _, obj in pairs(visuals.Box) do obj.Visible = false end
         for _, obj in pairs(visuals.HealthBar) do obj.Visible = false end
         for _, obj in pairs(visuals.Tracer) do obj.Visible = false end
+        for _, obj in pairs(visuals.Box3D) do obj.Visible = false end
         visuals.Name.Visible = false
         visuals.Distance.Visible = false
         return
@@ -315,6 +326,7 @@ local function UpdateVisuals(entry)
         for _, obj in pairs(visuals.Box) do obj.Visible = false end
         for _, obj in pairs(visuals.HealthBar) do obj.Visible = false end
         for _, obj in pairs(visuals.Tracer) do obj.Visible = false end
+        for _, obj in pairs(visuals.Box3D) do obj.Visible = false end
         visuals.Name.Visible = false
         visuals.Distance.Visible = false
         return
@@ -325,32 +337,138 @@ local function UpdateVisuals(entry)
     local name, distance_obj = visuals.Name, visuals.Distance
     local espEnabled = Environment.Settings.Enabled
     local boxEnabled = Environment.Box.Enabled
-    box.Position = position
-    box.Size = size
-    box.Color = CoreFunctions.GetTeamColor(player)
-    box.Transparency = Environment.Box.Transparency
-    box.Filled = false
-    box.Thickness = Environment.Box.Thickness
-    box.Visible = espEnabled and boxEnabled and visible
-    if Environment.Box.FillEnabled then
-        fillBox.Position = position
-        fillBox.Size = size
-        fillBox.Color = CoreFunctions.GetTeamColor(player)
-        fillBox.Transparency = Environment.Box.FillTransparency
-        fillBox.Filled = true
-        fillBox.Visible = espEnabled and boxEnabled and visible
+    if Environment.Box.ViewBox == "3D" then
+        for _, obj in pairs(visuals.Box) do obj.Visible = false end
+        local hrp = character.HumanoidRootPart
+        local hrpPos, onScreen = CurrentCamera:WorldToViewportPoint(hrp.Position)
+        if onScreen and boxEnabled and espEnabled then
+            local Size = Vector3.new(2, 3, 2)
+            local Top1 = CurrentCamera:WorldToViewportPoint((hrp.CFrame * CFrame.new(-Size.X, Size.Y, -Size.Z)).p)
+            local Top2 = CurrentCamera:WorldToViewportPoint((hrp.CFrame * CFrame.new(-Size.X, Size.Y, Size.Z)).p)
+            local Top3 = CurrentCamera:WorldToViewportPoint((hrp.CFrame * CFrame.new(Size.X, Size.Y, Size.Z)).p)
+            local Top4 = CurrentCamera:WorldToViewportPoint((hrp.CFrame * CFrame.new(Size.X, Size.Y, -Size.Z)).p)
+            local Bottom1 = CurrentCamera:WorldToViewportPoint((hrp.CFrame * CFrame.new(-Size.X, -Size.Y, -Size.Z)).p)
+            local Bottom2 = CurrentCamera:WorldToViewportPoint((hrp.CFrame * CFrame.new(-Size.X, -Size.Y, Size.Z)).p)
+            local Bottom3 = CurrentCamera:WorldToViewportPoint((hrp.CFrame * CFrame.new(Size.X, -Size.Y, Size.Z)).p)
+            local Bottom4 = CurrentCamera:WorldToViewportPoint((hrp.CFrame * CFrame.new(Size.X, -Size.Y, -Size.Z)).p)
+            local box3d = visuals.Box3D
+            box3d.box_line1.From = Vector2.new(Top1.X, Top1.Y)
+            box3d.box_line1.To = Vector2.new(Top2.X, Top2.Y)
+            box3d.box_line2.From = Vector2.new(Top2.X, Top2.Y)
+            box3d.box_line2.To = Vector2.new(Top3.X, Top3.Y)
+            box3d.box_line3.From = Vector2.new(Top3.X, Top3.Y)
+            box3d.box_line3.To = Vector2.new(Top4.X, Top4.Y)
+            box3d.box_line4.From = Vector2.new(Top4.X, Top4.Y)
+            box3d.box_line4.To = Vector2.new(Top1.X, Top1.Y)
+            box3d.box_line5.From = Vector2.new(Bottom1.X, Bottom1.Y)
+            box3d.box_line5.To = Vector2.new(Bottom2.X, Bottom2.Y)
+            box3d.box_line6.From = Vector2.new(Bottom2.X, Bottom2.Y)
+            box3d.box_line6.To = Vector2.new(Bottom3.X, Bottom3.Y)
+            box3d.box_line7.From = Vector2.new(Bottom3.X, Bottom3.Y)
+            box3d.box_line7.To = Vector2.new(Bottom4.X, Bottom4.Y)
+            box3d.box_line8.From = Vector2.new(Bottom4.X, Bottom4.Y)
+            box3d.box_line8.To = Vector2.new(Bottom1.X, Bottom1.Y)
+            box3d.box_line9.From = Vector2.new(Bottom1.X, Bottom1.Y)
+            box3d.box_line9.To = Vector2.new(Top1.X, Top1.Y)
+            box3d.box_line10.From = Vector2.new(Bottom2.X, Bottom2.Y)
+            box3d.box_line10.To = Vector2.new(Top2.X, Top2.Y)
+            box3d.box_line11.From = Vector2.new(Bottom3.X, Bottom3.Y)
+            box3d.box_line11.To = Vector2.new(Top3.X, Top3.Y)
+            box3d.box_line12.From = Vector2.new(Bottom4.X, Bottom4.Y)
+            box3d.box_line12.To = Vector2.new(Top4.X, Top4.Y)
+            box3d.box_line_black1.From = Vector2.new(Top1.X, Top1.Y)
+            box3d.box_line_black1.To = Vector2.new(Top2.X, Top2.Y)
+            box3d.box_line_black2.From = Vector2.new(Top2.X, Top2.Y)
+            box3d.box_line_black2.To = Vector2.new(Top3.X, Top3.Y)
+            box3d.box_line_black3.From = Vector2.new(Top3.X, Top3.Y)
+            box3d.box_line_black3.To = Vector2.new(Top4.X, Top4.Y)
+            box3d.box_line_black4.From = Vector2.new(Top4.X, Top4.Y)
+            box3d.box_line_black4.To = Vector2.new(Top1.X, Top1.Y)
+            box3d.box_line_black5.From = Vector2.new(Bottom1.X, Bottom1.Y)
+            box3d.box_line_black5.To = Vector2.new(Bottom2.X, Bottom2.Y)
+            box3d.box_line_black6.From = Vector2.new(Bottom2.X, Bottom2.Y)
+            box3d.box_line_black6.To = Vector2.new(Bottom3.X, Bottom3.Y)
+            box3d.box_line_black7.From = Vector2.new(Bottom3.X, Bottom3.Y)
+            box3d.box_line_black7.To = Vector2.new(Bottom4.X, Bottom4.Y)
+            box3d.box_line_black8.From = Vector2.new(Bottom4.X, Bottom4.Y)
+            box3d.box_line_black8.To = Vector2.new(Bottom1.X, Bottom1.Y)
+            box3d.box_line_black9.From = Vector2.new(Bottom1.X, Bottom1.Y)
+            box3d.box_line_black9.To = Vector2.new(Top1.X, Top1.Y)
+            box3d.box_line_black10.From = Vector2.new(Bottom2.X, Bottom2.Y)
+            box3d.box_line_black10.To = Vector2.new(Top2.X, Top2.Y)
+            box3d.box_line_black11.From = Vector2.new(Bottom3.X, Bottom3.Y)
+            box3d.box_line_black11.To = Vector2.new(Top3.X, Top3.Y)
+            box3d.box_line_black12.From = Vector2.new(Bottom4.X, Bottom4.Y)
+            box3d.box_line_black12.To = Vector2.new(Top4.X, Top4.Y)
+            if Environment.Box.FillEnabled then
+                box3d.box_quad1.PointA = Vector2.new(Bottom1.X, Bottom1.Y)
+                box3d.box_quad1.PointB = Vector2.new(Bottom2.X, Bottom2.Y)
+                box3d.box_quad1.PointC = Vector2.new(Bottom3.X, Bottom3.Y)
+                box3d.box_quad1.PointD = Vector2.new(Bottom4.X, Bottom4.Y)
+                box3d.box_quad2.PointA = Vector2.new(Top1.X, Top1.Y)
+                box3d.box_quad2.PointB = Vector2.new(Top2.X, Top2.Y)
+                box3d.box_quad2.PointC = Vector2.new(Top3.X, Top3.Y)
+                box3d.box_quad2.PointD = Vector2.new(Top4.X, Top4.Y)
+                box3d.box_quad3.PointA = Vector2.new(Bottom1.X, Bottom1.Y)
+                box3d.box_quad3.PointB = Vector2.new(Top1.X, Top1.Y)
+                box3d.box_quad3.PointC = Vector2.new(Top4.X, Top4.Y)
+                box3d.box_quad3.PointD = Vector2.new(Bottom4.X, Bottom4.Y)
+                box3d.box_quad4.PointA = Vector2.new(Bottom2.X, Bottom2.Y)
+                box3d.box_quad4.PointB = Vector2.new(Top2.X, Top2.Y)
+                box3d.box_quad4.PointC = Vector2.new(Top3.X, Top3.Y)
+                box3d.box_quad4.PointD = Vector2.new(Bottom3.X, Bottom3.Y)
+                box3d.box_quad5.PointA = Vector2.new(Bottom1.X, Bottom1.Y)
+                box3d.box_quad5.PointB = Vector2.new(Top1.X, Top1.Y)
+                box3d.box_quad5.PointC = Vector2.new(Top2.X, Top2.Y)
+                box3d.box_quad5.PointD = Vector2.new(Bottom2.X, Bottom2.Y)
+                box3d.box_quad6.PointA = Vector2.new(Bottom3.X, Bottom3.Y)
+                box3d.box_quad6.PointB = Vector2.new(Top3.X, Top3.Y)
+                box3d.box_quad6.PointC = Vector2.new(Top4.X, Top4.Y)
+                box3d.box_quad6.PointD = Vector2.new(Bottom4.X, Bottom4.Y)
+            end
+            for i = 1, 12 do
+                box3d["box_line" .. i].Visible = true
+                box3d["box_line" .. i].Color = CoreFunctions.GetTeamColor(player)
+                box3d["box_line_black" .. i].Visible = Environment.Box.Outline
+                box3d["box_line_black" .. i].Color = Environment.Box.OutlineColor
+            end
+            for i = 1, 6 do
+                box3d["box_quad" .. i].Visible = Environment.Box.FillEnabled
+                box3d["box_quad" .. i].Color = CoreFunctions.GetTeamColor(player)
+                box3d["box_quad" .. i].Transparency = Environment.Box.FillTransparency
+            end
+        else
+            for _, obj in pairs(visuals.Box3D) do obj.Visible = false end
+        end
     else
-        fillBox.Visible = false
-    end
-    if Environment.Box.Outline then
-        boxOutline.Position = position
-        boxOutline.Size = size
-        boxOutline.Color = Environment.Box.OutlineColor
-        boxOutline.Thickness = Environment.Box.Thickness + 1
-        boxOutline.Transparency = Environment.Box.Transparency
-        boxOutline.Visible = espEnabled and boxEnabled and visible
-    else
-        boxOutline.Visible = false
+        for _, obj in pairs(visuals.Box3D) do obj.Visible = false end
+        box.Position = position
+        box.Size = size
+        box.Color = CoreFunctions.GetTeamColor(player)
+        box.Transparency = Environment.Box.Transparency
+        box.Filled = false
+        box.Thickness = Environment.Box.Thickness
+        box.Visible = espEnabled and boxEnabled and visible
+        if Environment.Box.FillEnabled then
+            fillBox.Position = position
+            fillBox.Size = size
+            fillBox.Color = CoreFunctions.GetTeamColor(player)
+            fillBox.Transparency = Environment.Box.FillTransparency
+            fillBox.Filled = true
+            fillBox.Visible = espEnabled and boxEnabled and visible
+        else
+            fillBox.Visible = false
+        end
+        if Environment.Box.Outline then
+            boxOutline.Position = position
+            boxOutline.Size = size
+            boxOutline.Color = Environment.Box.OutlineColor
+            boxOutline.Thickness = Environment.Box.Thickness + 1
+            boxOutline.Transparency = Environment.Box.Transparency
+            boxOutline.Visible = espEnabled and boxEnabled and visible
+        else
+            boxOutline.Visible = false
+        end
     end
     if Environment.HealthBar.Enabled then
         local health = math.clamp(humanoid.Health, 0, humanoid.MaxHealth)
@@ -671,6 +789,7 @@ local function InitESP()
             for _, obj in pairs(entry.Visuals.Box) do obj:Remove() end
             for _, obj in pairs(entry.Visuals.HealthBar) do obj:Remove() end
             for _, obj in pairs(entry.Visuals.Tracer) do obj:Remove() end
+            for _, obj in pairs(entry.Visuals.Box3D) do obj:Remove() end
             entry.Visuals.Name:Remove()
             entry.Visuals.Distance:Remove()
             Environment.WrappedObjects[leftPlayer] = nil
@@ -735,6 +854,7 @@ RunService.RenderStepped:Connect(function()
 end)
 _G_ESPEnabled = function(state) Environment.Settings.Enabled = state end
 _G_BoxEnabled = function(state) Environment.Box.Enabled = state end
+_G_SetViewBox = function(state) Environment.Box.ViewBox = state end
 _G_OutlineEnabled = function(state) Environment.Box.Outline = state end
 _G_FillBoxEnabled = function(state) Environment.Box.FillEnabled = state end
 _G_HealthBarEnabled = function(state) Environment.HealthBar.Enabled = state end
