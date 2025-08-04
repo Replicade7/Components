@@ -34,6 +34,7 @@ getgenv().SimpleESP = {
         Thickness = 1,
         OutlineColor = Color3fromRGB(0, 0, 0),
         Outline = false,
+        OutlineThickness = 2,
         FillEnabled = false,
         FillTransparency = 0.5
     },
@@ -432,7 +433,7 @@ local function UpdateVisuals(entry)
                 box3d["box_line" .. i].Thickness = Environment.Box.Thickness
                 box3d["box_line_black" .. i].Visible = Environment.Box.Outline
                 box3d["box_line_black" .. i].Color = Environment.Box.OutlineColor
-                box3d["box_line_black" .. i].Thickness = Environment.Box.Thickness + 1
+                box3d["box_line_black" .. i].Thickness = Environment.Box.OutlineThickness
             end
             for i = 1, 6 do
                 box3d["box_quad" .. i].Visible = Environment.Box.FillEnabled
