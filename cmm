@@ -80,6 +80,10 @@ getgenv().SimpleESP = {
         Font = 2,
         Size = 12
     },
+    Chams = {
+        Enabled = false,
+        Transparency = 0.5
+    },
     WrappedObjects = {}
 }
 local Environment = getgenv().SimpleESP
@@ -686,6 +690,48 @@ Players.PlayerAdded:Connect(function(newplr)
 end)
 Players.PlayerRemoving:Connect(function(plr)
     skeletonInstance:removeEsp(plr)
+    if plr.Character and plr.Character:FindFirstChild("PlayerHighlight") then
+        plr.Character.PlayerHighlight:Destroy()
+    end
+end)
+RunService.RenderStepped:Connect(function()
+    if not Environment.Settings.Enabled or not Environment.Chams.Enabled then
+        for _, plr in ipairs(GetPlayers()) do
+            if plr.Character and plr.Character:FindFirstChild("PlayerHighlight") then
+                plr.Character.PlayerHighlight:Destroy()
+            end
+        end
+        return
+    end
+    for _, plr in ipairs(GetPlayers()) do
+        if plr ~= LocalPlayer then
+            local character = plr.Character
+            local h = character and character:FindFirstChild("PlayerHighlight")
+            local humanoid = character and character:FindFirstChild("Humanoid")
+            local shouldHighlight = humanoid and humanoid.Health > 0
+            if Environment.Settings.HideTeam and plr.Team == LocalPlayer.Team then
+                shouldHighlight = false
+            end
+            if shouldHighlight then
+                if not h then
+                    h = Instance.new("Highlight")
+                    h.Name = "PlayerHighlight"
+                    h.Adornee = character
+                    h.Parent = character
+                    h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                    h.OutlineTransparency = 0
+                end
+                local color = (Environment.Settings.TeamColorEnabled and plr.TeamColor and plr.TeamColor.Color) or Environment.Box.Color
+                h.FillColor = color
+                h.OutlineColor = color
+                h.FillTransparency = Environment.Chams.Transparency
+            else
+                if h then
+                    h:Destroy()
+                end
+            end
+        end
+    end
 end)
 _G_ESPEnabled = function(state) Environment.Settings.Enabled = state end
 _G_BoxEnabled = function(state) Environment.Box.Enabled = state end
