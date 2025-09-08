@@ -1,3 +1,4 @@
+-- Код 1: Обновлённый loandstring (исправленный функционал Work For Npc)
 local game = game
 local Vector2new = Vector2.new
 local Drawingnew = Drawing.new
@@ -91,9 +92,7 @@ getgenv().SimpleESP = {
         Color = Color3fromRGB(255, 255, 255)
     },
     WrappedObjects = {},
-    NPCObjects = {},
-    npcAddedConnection = nil,
-    npcRemovedConnection = nil
+    NPCObjects = {}
 }
 local Environment = getgenv().SimpleESP
 local mouse = LocalPlayer:GetMouse()
@@ -896,7 +895,7 @@ local function InitESP()
     end)
 end
 local function InitNPCESP()
-    for _, model in ipairs(Workspace:GetDescendants()) do
+    for _, model in ipairs(Workspace:GetChildren()) do
         if IsNPC(model) then
             local entry = {Visuals = CreateVisuals(model, true), Player = model, IsNPC = true}
             Environment.NPCObjects[model] = entry
@@ -911,7 +910,8 @@ local function InitNPCESP()
             SkeletonESPFunction(model, true)
         end
     end
-    Environment.npcAddedConnection = Workspace.DescendantAdded:Connect(function(child)
+    local npcAdded
+    npcAdded = Workspace.ChildAdded:Connect(function(child)
         if IsNPC(child) then
             local entry = {Visuals = CreateVisuals(child, true), Player = child, IsNPC = true}
             Environment.NPCObjects[child] = entry
@@ -926,7 +926,8 @@ local function InitNPCESP()
             SkeletonESPFunction(child, true)
         end
     end)
-    Environment.npcRemovedConnection = Workspace.DescendantRemoving:Connect(function(child)
+    local npcRemoved
+    npcRemoved = Workspace.ChildRemoved:Connect(function(child)
         if Environment.NPCObjects[child] then
             local entry = Environment.NPCObjects[child]
             for _, obj in pairs(entry.Visuals.Box) do obj:Remove() end
@@ -937,10 +938,9 @@ local function InitNPCESP()
             entry.Visuals.CornerBox.fillBox:Remove()
             entry.Visuals.Name:Remove()
             entry.Visuals.Distance:Remove()
-            skeletonInstance:removeEsp(child)
-            RemoveArrow(child)
             Environment.NPCObjects[child] = nil
         end
+        skeletonInstance:removeEsp(child)
     end)
 end
 InitESP()
@@ -1057,17 +1057,8 @@ _G_WorksforNPCesp = function(state)
             entry.Visuals.Name:Remove()
             entry.Visuals.Distance:Remove()
             skeletonInstance:removeEsp(npc)
-            RemoveArrow(npc)
         end
         Environment.NPCObjects = {}
-        if Environment.npcAddedConnection then
-            Environment.npcAddedConnection:Disconnect()
-            Environment.npcAddedConnection = nil
-        end
-        if Environment.npcRemovedConnection then
-            Environment.npcRemovedConnection:Disconnect()
-            Environment.npcRemovedConnection = nil
-        end
     end
 end
 return Environment
